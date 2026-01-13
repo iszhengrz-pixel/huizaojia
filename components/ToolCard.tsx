@@ -6,9 +6,12 @@ import { ToolItem } from '../types';
 interface ToolCardProps {
   tool: ToolItem;
   onClick: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggle?: (e: React.MouseEvent) => void;
 }
 
-const ToolCard: React.FC<ToolCardProps> = ({ tool, onClick }) => {
+const ToolCard: React.FC<ToolCardProps> = ({ tool, onClick, selectable, selected, onToggle }) => {
   const getIconColor = (id: string) => {
     const colors = [
       'bg-blue-50 text-blue-600',
@@ -27,7 +30,9 @@ const ToolCard: React.FC<ToolCardProps> = ({ tool, onClick }) => {
   return (
     <div 
       onClick={onClick}
-      className="group relative bg-white rounded-2xl p-4 border border-slate-100 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-300 cursor-pointer flex items-center space-x-4 overflow-hidden"
+      className={`group relative bg-white rounded-2xl p-4 border transition-all duration-300 cursor-pointer flex items-center space-x-4 overflow-hidden ${
+        selectable && selected ? 'border-blue-500 shadow-md bg-blue-50/10' : 'border-slate-100'
+      } hover:border-blue-200 hover:shadow-xl hover:shadow-blue-500/5`}
     >
       {/* Icon Container */}
       <div className={`shrink-0 w-12 h-12 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${getIconColor(tool.id)}`}>
@@ -44,14 +49,29 @@ const ToolCard: React.FC<ToolCardProps> = ({ tool, onClick }) => {
         </p>
       </div>
 
-      {/* Decorative Arrow (Appears on Hover) */}
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-300">
-        <Icon name="ChevronRight" size={16} className="text-blue-400" />
-      </div>
+      {/* Action / Selectable Area */}
+      {selectable ? (
+        <div 
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle?.(e);
+          }}
+          className={`shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+            selected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 bg-white group-hover:border-blue-400'
+          }`}
+        >
+          {selected && <Icon name="Check" size={14} strokeWidth={3} />}
+        </div>
+      ) : (
+        /* Decorative Arrow (Appears on Hover) */
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-300">
+          <Icon name="ChevronRight" size={16} className="text-blue-400" />
+        </div>
+      )}
       
       {/* Hot Badge */}
       {tool.isHot && (
-        <div className="absolute top-0 right-0">
+        <div className="absolute top-0 right-0 pointer-events-none">
           <div className="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-bl-lg font-bold shadow-sm">
             HOT
           </div>

@@ -8,23 +8,68 @@ import DateCalculatorView from './components/DateCalculatorView';
 import TaxCalculatorView from './components/TaxCalculatorView';
 import AIVisionView from './components/AIVisionView';
 import OKContractCompareView from './components/OKContractCompareView';
+import ToolManagementView from './components/ToolManagementView';
+import AllToolsView from './components/AllToolsView';
 import ProfileView from './components/ProfileView';
 import UserManagementView from './components/UserManagementView';
 import RoleManagementView from './components/RoleManagementView';
 import MenuManagementView from './components/MenuManagementView';
-import { HOT_TOOLS, MY_TOOLS } from './constants';
+import { ALL_TOOLS, DEFAULT_HOT_TOOLS, DEFAULT_MY_TOOLS } from './constants';
 
 const App: React.FC = () => {
   const [activeId, setActiveId] = useState('home');
   const [activeSubId, setActiveSubId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Tool Selection State
+  const [selectedToolIds, setSelectedToolIds] = useState<string[]>(DEFAULT_MY_TOOLS);
+  const [view, setView] = useState<'default' | 'tool-management' | 'all-tools'>('default');
 
   const handleSelect = (id: string, subId?: string) => {
     setActiveId(id);
     setActiveSubId(subId || '');
+    setView('default');
   };
 
+  const handleToggleTool = (id: string) => {
+    setSelectedToolIds(prev => 
+      prev.includes(id) ? prev.filter(tid => tid !== id) : [...prev, id]
+    );
+  };
+
+  const hotTools = ALL_TOOLS.filter(t => DEFAULT_HOT_TOOLS.includes(t.id));
+  const myTools = ALL_TOOLS.filter(t => selectedToolIds.includes(t.id));
+
   const renderContent = () => {
+    // Tool Management Routing
+    if (view === 'tool-management') {
+      return (
+        <ToolManagementView 
+          selectedToolIds={selectedToolIds}
+          onToggleTool={handleToggleTool}
+          onBack={() => setView('default')}
+        />
+      );
+    }
+
+    // All Tools View
+    if (view === 'all-tools') {
+      return (
+        <AllToolsView 
+          onSelectTool={(tool) => {
+            // Logic to open the specific tool view based on ID
+            if(tool.id === 'ai-vision') handleSelect('quantity', 'ai-vision');
+            else if(tool.id === 'ok-contract') handleSelect('pricing', 'ok-contract');
+            else if(tool.id === 'ok-date-calc') handleSelect('general', 'ok-date-calc');
+            else if(tool.id === 'ok-tax-calc') handleSelect('general', 'ok-tax-calc');
+            else if(tool.category === 'AI问答') handleSelect('ai-qa', tool.id);
+            else alert(`启动工具: ${tool.name}`);
+          }}
+          onBack={() => setView('default')}
+        />
+      );
+    }
+
     // Sub-view Routing
     if (activeSubId === 'ok-date-calc') {
       return <DateCalculatorView />;
@@ -114,14 +159,17 @@ const App: React.FC = () => {
                   <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
                   <h2 className="text-xl font-bold text-slate-800">热门工具</h2>
                 </div>
-                <button className="text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center transition-colors">
+                <button 
+                  onClick={() => setView('all-tools')}
+                  className="text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center transition-colors"
+                >
                   查看全部 <Icon name="ChevronRight" size={14} className="ml-1" />
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {HOT_TOOLS.map(tool => (
+                {hotTools.map(tool => (
                   <ToolCard key={tool.id} tool={tool} onClick={() => {
-                    if(tool.id === 'h6') handleSelect('quantity', 'ai-vision');
+                    if(tool.id === 'ai-vision') handleSelect('quantity', 'ai-vision');
                     else alert(`启动工具: ${tool.name}`);
                   }} />
                 ))}
@@ -135,17 +183,33 @@ const App: React.FC = () => {
                   <div className="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
                   <h2 className="text-xl font-bold text-slate-800">我的工具</h2>
                 </div>
-                <button className="text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center transition-colors">
+                <button 
+                  onClick={() => setView('tool-management')}
+                  className="text-sm text-blue-600 font-medium hover:text-blue-800 flex items-center transition-colors"
+                >
                   管理工具 <Icon name="PlusCircle" size={14} className="ml-1" />
                 </button>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {MY_TOOLS.map(tool => (
+                {myTools.map(tool => (
                   <ToolCard key={tool.id} tool={tool} onClick={() => {
-                    if(tool.id === 'm7') handleSelect('pricing', 'ok-contract');
+                    if(tool.id === 'ok-contract') handleSelect('pricing', 'ok-contract');
+                    else if(tool.id === 'ok-date-calc') handleSelect('general', 'ok-date-calc');
+                    else if(tool.id === 'ok-tax-calc') handleSelect('general', 'ok-tax-calc');
+                    else if(tool.id === 'ai-vision') handleSelect('quantity', 'ai-vision');
                     else alert(`启动工具: ${tool.name}`);
                   }} />
                 ))}
+                {/* Empty State / Add Button */}
+                {myTools.length === 0 && (
+                  <div 
+                    onClick={() => setView('tool-management')}
+                    className="col-span-full py-12 bg-white rounded-[32px] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 hover:border-blue-300 transition-all cursor-pointer group"
+                  >
+                    <Icon name="PlusCircle" size={48} className="mb-4 opacity-20 group-hover:scale-110 group-hover:text-blue-500 transition-all" />
+                    <p className="font-bold">暂无定制工具，点击去添加</p>
+                  </div>
+                )}
               </div>
             </section>
 

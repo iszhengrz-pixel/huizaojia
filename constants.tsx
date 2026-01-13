@@ -75,22 +75,61 @@ export const NAVIGATION_MENU: MenuItem[] = [
   },
 ];
 
-export const HOT_TOOLS: ToolItem[] = [
-  { id: 'h1', name: '2024清单', icon: 'FileText', category: 'hot', isHot: true },
-  { id: 'h2', name: '定额', icon: 'Database', category: 'hot', isHot: true },
-  { id: 'h3', name: '指标数据', icon: 'BarChart3', category: 'hot', isHot: true },
-  { id: 'h4', name: 'zc文件', icon: 'ScrollText', category: 'hot', isHot: true },
-  { id: 'h5', name: 'AI文本统计', icon: 'FileJson', category: 'hot', isHot: true },
-  { id: 'h6', name: 'AI识图算量', icon: 'ScanSearch', category: 'hot', isHot: true },
-  { id: 'h7', name: 'AI批量提取CAD表', icon: 'Layers', category: 'hot', isHot: true },
+export interface ToolCategory {
+  category: string;
+  tools: ToolItem[];
+}
+
+export const ALL_TOOLS_CATEGORIZED: ToolCategory[] = [
+  {
+    category: 'AI问答',
+    tools: [
+      { id: 'qa-2024-list', name: '2024清单', icon: 'FileText', category: 'AI问答', isHot: true },
+      { id: 'qa-quota', name: '定额', icon: 'Database', category: 'AI问答', isHot: true },
+      { id: 'qa-indicators', name: '指标数据', icon: 'BarChart3', category: 'AI问答', isHot: true },
+      { id: 'qa-policy', name: '政策文件', icon: 'ScrollText', category: 'AI问答' },
+    ]
+  },
+  {
+    category: '汇计量',
+    tools: [
+      { id: 'qa-text-stats', name: 'AI文本统计', icon: 'FileJson', category: '汇计量', isHot: true },
+      { id: 'ai-vision', name: 'AI识图算量', icon: 'ScanSearch', category: '汇计量', isHot: true },
+      { id: 'ai-cad', name: 'AI批量提取CAD表', icon: 'Layers', category: '汇计量', isHot: true },
+      { id: 'list-compare', name: '清单工程量对比', icon: 'ArrowLeftRight', category: '汇计量' },
+      { id: 'calc-tool', name: '工程量计算器', icon: 'Divide', category: '汇计量' },
+      { id: 'formula', name: '公式大全', icon: 'FunctionSquare', category: '汇计量' },
+      { id: 'hardware-calc', name: '五金计算器', icon: 'Anvil', category: '汇计量' },
+    ]
+  },
+  {
+    category: '汇计价',
+    tools: [
+      { id: 'material-diff', name: '材料调差', icon: 'TrendingUp', category: '汇计价' },
+      { id: 'fee-standards', name: '前后期收费标准库', icon: 'LibraryBig', category: '汇计价' },
+      { id: 'ai-plant-list', name: 'AI苗木表编清单', icon: 'Sprout', category: '汇计价' },
+      { id: 'ok-contract', name: 'ok合同价对比', icon: 'FileDiff', category: '汇计价' },
+      { id: 'price-file-compare', name: '计价文件对比', icon: 'Files', category: '汇计价' },
+    ]
+  },
+  {
+    category: '汇通用',
+    tools: [
+      { id: 'ok-date-calc', name: 'ok日期计算器', icon: 'CalendarDays', category: '汇通用' },
+      { id: 'duration-quota', name: '工期定额', icon: 'Clock', category: '汇通用' },
+      { id: 'fee-calc', name: '收费计算器', icon: 'Wallet', category: '汇通用' },
+      { id: 'excel-tools', name: '表格处理功能', icon: 'Table2', category: '汇通用' },
+      { id: 'ok-dwg-compare', name: 'okAI图纸对比', icon: 'Dna', category: '汇通用' },
+      { id: 'amount-converter', name: '金额大小写转换', icon: 'Coins', category: '汇通用' },
+      { id: 'ok-tax-calc', name: 'OK税费计算', icon: 'Calculator', category: '汇通用' },
+      { id: 'simple-calc', name: '计算器', icon: 'PlusMinus', category: '汇通用' },
+      { id: 'general-data', name: '通用数据', icon: 'Info', category: '汇通用' },
+      { id: 'camera-watermark', name: '工程水印相机', icon: 'Camera', category: '汇通用' },
+    ]
+  }
 ];
 
-export const MY_TOOLS: ToolItem[] = [
-  { id: 'm1', name: '工程量计算器', icon: 'Divide', category: 'mine' },
-  { id: 'm2', name: '公式大全', icon: 'FunctionSquare', category: 'mine' },
-  { id: 'm3', name: '五金计算器', icon: 'Anvil', category: 'mine' },
-  { id: 'm4', name: '材料调差', icon: 'TrendingUp', category: 'mine' },
-  { id: 'm5', name: '前后期收费标准库', icon: 'LibraryBig', category: 'mine' },
-  { id: 'm6', name: 'AI苗木表编清单', icon: 'Sprout', category: 'mine' },
-  { id: 'm7', name: 'ok合同价对比', icon: 'FileDiff', category: 'mine' },
-];
+export const ALL_TOOLS: ToolItem[] = ALL_TOOLS_CATEGORIZED.flatMap(cat => cat.tools);
+
+export const DEFAULT_HOT_TOOLS: string[] = ['qa-2024-list', 'qa-quota', 'qa-indicators', 'ai-vision', 'ai-cad', 'qa-text-stats'];
+export const DEFAULT_MY_TOOLS: string[] = ['calc-tool', 'formula', 'hardware-calc', 'material-diff', 'fee-standards', 'ai-plant-list', 'ok-contract'];
