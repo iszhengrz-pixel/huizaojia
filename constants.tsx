@@ -61,6 +61,9 @@ export const NAVIGATION_MENU: MenuItem[] = [
     label: '系统设置', 
     icon: 'UserCog',
     children: [
+      { id: 'user-management', label: '用户管理', parentId: 'settings' },
+      { id: 'role-management', label: '角色管理', parentId: 'settings' },
+      { id: 'menu-management', label: '菜单管理', parentId: 'settings' },
       { id: 'survey', label: '问卷功能', parentId: 'settings' },
       { id: 'register', label: '用户注册', parentId: 'settings' },
       { id: 'profile', label: '个人中心', parentId: 'settings' },

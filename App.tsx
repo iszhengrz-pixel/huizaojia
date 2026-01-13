@@ -9,6 +9,9 @@ import TaxCalculatorView from './components/TaxCalculatorView';
 import AIVisionView from './components/AIVisionView';
 import OKContractCompareView from './components/OKContractCompareView';
 import ProfileView from './components/ProfileView';
+import UserManagementView from './components/UserManagementView';
+import RoleManagementView from './components/RoleManagementView';
+import MenuManagementView from './components/MenuManagementView';
 import { HOT_TOOLS, MY_TOOLS } from './constants';
 
 const App: React.FC = () => {
@@ -41,6 +44,18 @@ const App: React.FC = () => {
 
     if (activeSubId === 'profile') {
       return <ProfileView />;
+    }
+
+    if (activeSubId === 'user-management') {
+      return <UserManagementView />;
+    }
+
+    if (activeSubId === 'role-management') {
+      return <RoleManagementView />;
+    }
+
+    if (activeSubId === 'menu-management') {
+      return <MenuManagementView />;
     }
 
     if (activeId === 'ai-qa' && activeSubId) {
