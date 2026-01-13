@@ -1,0 +1,8 @@
+{
+  "name": "汇造价 - 智能工程造价一站式平台",
+  "description": "参考腾讯帮小忙设计的造价行业全能工具箱，包含AI问答、计量计价工具及通用工程助手。",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
