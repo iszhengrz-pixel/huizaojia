@@ -345,81 +345,83 @@ const OKContractCompareView: React.FC = () => {
         </div>
 
         {/* AI 差异分析 Sidebar */}
-        <div className="w-80 bg-white border-l border-slate-200 flex flex-col shrink-0">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Icon name="BrainCircuit" size={20} className="text-blue-600" />
-              <span className="font-bold text-sm text-slate-800">AI 差异分析</span>
+        {showResults && (
+          <div className="w-80 bg-white border-l border-slate-200 flex flex-col shrink-0 animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Icon name="BrainCircuit" size={20} className="text-blue-600" />
+                <span className="font-bold text-sm text-slate-800">AI 差异分析</span>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-white p-4 space-y-4">
+               <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100 mb-2">
+                  <h4 className="text-xs font-black text-blue-600 mb-2">对比摘要</h4>
+                  <div className="space-y-2">
+                     <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">总差异项</span>
+                        <span className="font-black text-red-600">8 项</span>
+                     </div>
+                     <div className="flex justify-between text-xs">
+                        <span className="text-slate-500">累计核减</span>
+                        <span className="font-black text-emerald-600">¥ 158.00</span>
+                     </div>
+                  </div>
+               </div>
+
+               <div className="space-y-4">
+                  <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">差异明细定位</h4>
+                  {MOCK_DATA.filter(r => !r.isHeader && r.contract.total !== r.audit.total).map((row, i) => {
+                    // Find the first field that differs to show in the sidebar
+                    const diffField = (Object.keys(row.contract) as Array<keyof CostDetail>).find(
+                      key => row.contract[key] !== row.audit[key]
+                    ) || 'total';
+                    const fieldName = FIELD_NAMES[diffField];
+                    const diffVal = (row.contract[diffField] - row.audit[diffField]).toFixed(2);
+
+                    return (
+                      <div 
+                        key={row.id}
+                        className="group border border-slate-100 rounded-xl overflow-hidden bg-white hover:border-blue-200 shadow-sm transition-all"
+                      >
+                        {/* Header Item Name */}
+                        <div className="p-3 bg-slate-50/50 border-b border-slate-100">
+                          <p className="text-[11px] font-bold text-slate-800 leading-tight">
+                            <span className="text-blue-500 mr-2">{row.code}</span>
+                            {row.name}
+                          </p>
+                        </div>
+
+                        {/* Contract Row */}
+                        <button 
+                          onClick={() => scrollToRow(row.id, 'contract')}
+                          className="w-full text-left px-3 py-2 flex items-center border-l-4 border-l-blue-400 hover:bg-blue-50/50 transition-colors"
+                        >
+                          <span className="text-[10px] text-slate-500 flex-1 truncate">合同价: {fieldName}</span>
+                          <span className="text-[11px] font-black text-slate-700">¥ {row.contract[diffField].toFixed(2)}</span>
+                        </button>
+
+                        {/* Audit Row */}
+                        <button 
+                          onClick={() => scrollToRow(row.id, 'audit')}
+                          className="w-full text-left px-3 py-2 flex items-center border-l-4 border-l-emerald-400 hover:bg-emerald-50/50 transition-colors border-t border-slate-50"
+                        >
+                          <span className="text-[10px] text-slate-500 flex-1 truncate">送审价: {fieldName}</span>
+                          <span className="text-[11px] font-black text-slate-700">¥ {row.audit[diffField].toFixed(2)}</span>
+                        </button>
+
+                        {/* Difference Row */}
+                        <div className="px-3 py-2 flex items-center border-l-4 border-l-red-400 bg-red-50/30 border-t border-slate-50">
+                          <span className="text-[10px] text-red-500 font-bold flex-1">差异值</span>
+                          <span className="text-[11px] font-black text-red-600">¥ {diffVal}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+               </div>
             </div>
           </div>
-
-          <div className="flex-1 overflow-y-auto custom-scrollbar bg-white p-4 space-y-4">
-             <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100 mb-2">
-                <h4 className="text-xs font-black text-blue-600 mb-2">对比摘要</h4>
-                <div className="space-y-2">
-                   <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">总差异项</span>
-                      <span className="font-black text-red-600">8 项</span>
-                   </div>
-                   <div className="flex justify-between text-xs">
-                      <span className="text-slate-500">累计核减</span>
-                      <span className="font-black text-emerald-600">¥ 158.00</span>
-                   </div>
-                </div>
-             </div>
-
-             <div className="space-y-4">
-                <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">差异明细定位</h4>
-                {MOCK_DATA.filter(r => !r.isHeader && r.contract.total !== r.audit.total).map((row, i) => {
-                  // Find the first field that differs to show in the sidebar
-                  const diffField = (Object.keys(row.contract) as Array<keyof CostDetail>).find(
-                    key => row.contract[key] !== row.audit[key]
-                  ) || 'total';
-                  const fieldName = FIELD_NAMES[diffField];
-                  const diffVal = (row.contract[diffField] - row.audit[diffField]).toFixed(2);
-
-                  return (
-                    <div 
-                      key={row.id}
-                      className="group border border-slate-100 rounded-xl overflow-hidden bg-white hover:border-blue-200 shadow-sm transition-all"
-                    >
-                      {/* Header Item Name */}
-                      <div className="p-3 bg-slate-50/50 border-b border-slate-100">
-                        <p className="text-[11px] font-bold text-slate-800 leading-tight">
-                          <span className="text-blue-500 mr-2">{row.code}</span>
-                          {row.name}
-                        </p>
-                      </div>
-
-                      {/* Contract Row */}
-                      <button 
-                        onClick={() => scrollToRow(row.id, 'contract')}
-                        className="w-full text-left px-3 py-2 flex items-center border-l-4 border-l-blue-400 hover:bg-blue-50/50 transition-colors"
-                      >
-                        <span className="text-[10px] text-slate-500 flex-1 truncate">合同价: {fieldName}</span>
-                        <span className="text-[11px] font-black text-slate-700">¥ {row.contract[diffField].toFixed(2)}</span>
-                      </button>
-
-                      {/* Audit Row */}
-                      <button 
-                        onClick={() => scrollToRow(row.id, 'audit')}
-                        className="w-full text-left px-3 py-2 flex items-center border-l-4 border-l-emerald-400 hover:bg-emerald-50/50 transition-colors border-t border-slate-50"
-                      >
-                        <span className="text-[10px] text-slate-500 flex-1 truncate">送审价: {fieldName}</span>
-                        <span className="text-[11px] font-black text-slate-700">¥ {row.audit[diffField].toFixed(2)}</span>
-                      </button>
-
-                      {/* Difference Row */}
-                      <div className="px-3 py-2 flex items-center border-l-4 border-l-red-400 bg-red-50/30 border-t border-slate-50">
-                        <span className="text-[10px] text-red-500 font-bold flex-1">差异值</span>
-                        <span className="text-[11px] font-black text-red-600">¥ {diffVal}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-             </div>
-          </div>
-        </div>
+        )}
       </div>
       
       {/* 底部状态栏 */}
