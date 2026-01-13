@@ -86,16 +86,16 @@ const TaxCalculatorView: React.FC = () => {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-2">
               <div className="w-1 h-5 bg-blue-500 rounded-full"></div>
-              <h2 className="text-lg font-bold text-slate-800">由 [含税] 计算</h2>
+              <h2 className="text-lg font-bold text-slate-800">含税计算</h2>
             </div>
-            <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-lg uppercase tracking-widest">Input Mode: Gross</span>
+            <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black rounded-lg uppercase tracking-widest">INPUT MODE: GROSS</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {/* Input Side */}
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-semibold text-slate-500 mb-2 ml-1">含税金额 (Input)</label>
+                <label className="block text-sm font-semibold text-slate-500 mb-2 ml-1">含税金额</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">¥</span>
                   <input 
@@ -171,16 +171,16 @@ const TaxCalculatorView: React.FC = () => {
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-2">
               <div className="w-1 h-5 bg-emerald-500 rounded-full"></div>
-              <h2 className="text-lg font-bold text-slate-800">由 [不含税] 计算</h2>
+              <h2 className="text-lg font-bold text-slate-800">不含税计算</h2>
             </div>
-            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-lg uppercase tracking-widest">Input Mode: Net</span>
+            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black rounded-lg uppercase tracking-widest">INPUT MODE: NET</span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {/* Input Side */}
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-semibold text-slate-500 mb-2 ml-1">不含税金额 (Input)</label>
+                <label className="block text-sm font-semibold text-slate-500 mb-2 ml-1">不含税金额</label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">¥</span>
                   <input 

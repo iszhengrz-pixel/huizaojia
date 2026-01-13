@@ -309,18 +309,29 @@ const OKContractCompareView: React.FC = () => {
             </div>
           ) : (
             <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
-              <div className="bg-white border-b border-slate-200 px-6 pt-2 flex items-center space-x-1 shrink-0">
+              {/* Tab Container */}
+              <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center space-x-3 shrink-0">
                 <button 
                   onClick={() => setActiveTab('contract')}
-                  className={`px-6 py-2.5 text-xs font-black transition-all border-b-2 ${activeTab === 'contract' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  className={`px-8 py-2.5 text-sm font-black transition-all rounded-2xl flex items-center space-x-2 ${
+                    activeTab === 'contract' 
+                      ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/30' 
+                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
                 >
-                  合同价 (原始)
+                  <Icon name="FileText" size={16} />
+                  <span>合同价 (原始)</span>
                 </button>
                 <button 
                   onClick={() => setActiveTab('audit')}
-                  className={`px-6 py-2.5 text-xs font-black transition-all border-b-2 ${activeTab === 'audit' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                  className={`px-8 py-2.5 text-sm font-black transition-all rounded-2xl flex items-center space-x-2 ${
+                    activeTab === 'audit' 
+                      ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/30' 
+                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
                 >
-                  送审价 (比对)
+                  <Icon name="FileCheck" size={16} />
+                  <span>送审价 (比对)</span>
                 </button>
               </div>
 
