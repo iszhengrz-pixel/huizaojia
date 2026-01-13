@@ -1,10 +1,12 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+// Initialize the GoogleGenAI client using the API key from environment variables.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const askAI = async (prompt: string, category: string = 'General Cost Engineering') => {
   try {
+    // Call generateContent with the specific model and formatted prompt.
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `You are an expert AI assistant for "Hui Zao Jia" (汇造价), a professional Chinese cost engineering platform. 
@@ -13,6 +15,7 @@ export const askAI = async (prompt: string, category: string = 'General Cost Eng
       Please answer the following user question in professional Chinese:
       ${prompt}`,
     });
+    // Extract text directly from the response object as a property.
     return response.text || "对不起，我现在无法回答这个问题。";
   } catch (error) {
     console.error("Gemini API Error:", error);

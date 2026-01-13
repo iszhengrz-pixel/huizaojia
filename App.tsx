@@ -8,6 +8,7 @@ import DateCalculatorView from './components/DateCalculatorView';
 import TaxCalculatorView from './components/TaxCalculatorView';
 import AIVisionView from './components/AIVisionView';
 import OKContractCompareView from './components/OKContractCompareView';
+import ProfileView from './components/ProfileView';
 import { HOT_TOOLS, MY_TOOLS } from './constants';
 
 const App: React.FC = () => {
@@ -36,6 +37,10 @@ const App: React.FC = () => {
 
     if (activeSubId === 'ok-contract') {
       return <OKContractCompareView />;
+    }
+
+    if (activeSubId === 'profile') {
+      return <ProfileView />;
     }
 
     if (activeId === 'ai-qa' && activeSubId) {

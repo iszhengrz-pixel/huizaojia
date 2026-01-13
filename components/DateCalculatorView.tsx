@@ -31,18 +31,23 @@ const DateCalculatorView: React.FC = () => {
 
   // Helper to open native date picker
   const openPicker = (ref: React.RefObject<HTMLInputElement | null>) => {
-    if (ref.current) {
+    const el = ref.current;
+    if (el) {
+      // Cast to any to prevent narrowing issues that lead to 'never' type in the fallback logic.
+      const input = el as any;
       // Use modern showPicker API if available, fallback to focus/click
-      if ('showPicker' in ref.current) {
+      if (typeof input.showPicker === 'function') {
         try {
-          (ref.current as any).showPicker();
+          input.showPicker();
         } catch (e) {
-          ref.current.focus();
-          ref.current.click();
+          // If showPicker fails (e.g., due to user interaction rules), fallback to focus/click.
+          input.focus();
+          input.click();
         }
       } else {
-        ref.current.focus();
-        ref.current.click();
+        // Explicitly use focus and click for browsers that don't support showPicker.
+        input.focus();
+        input.click();
       }
     }
   };
