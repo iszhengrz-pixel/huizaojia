@@ -82,7 +82,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeId, activeSubId, onSelect }) =>
 
             {/* 子菜单 - 仅在非收起状态且展开时显示 */}
             {!isCollapsed && item.children && expandedMenus[item.id] && (
-              <div className="mt-1 ml-9 flex flex-col space-y-1 border-l border-slate-100 pl-3">
+              <div className="mt-1 ml-9 flex flex-col space-y-1 pl-3">
                 {item.children.map((sub) => (
                   <button
                     key={sub.id}

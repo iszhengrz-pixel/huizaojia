@@ -203,7 +203,7 @@ const App: React.FC = () => {
     if (activeId === 'home') {
       return (
         <div className="flex-1 overflow-y-auto custom-scrollbar bg-[#fcfdff]">
-          <div className="max-w-7xl mx-auto px-8">
+          <div className="w-full px-6 py-4">
             
             {/* Minimalist AI Dialogue Hero (Further Reduced Height & Enhanced Background) */}
             <div className="py-7 flex flex-col items-center relative transition-all duration-300">
@@ -269,7 +269,7 @@ const App: React.FC = () => {
                         onClick={handleHomeAISend}
                         className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-lg flex items-center justify-center shadow-md shadow-blue-500/10 hover:scale-105 active:scale-95 transition-all outline-none"
                       >
-                        <Icon name="Mic" size={16} />
+                        <Icon name="Send" size={16} />
                       </button>
                     </div>
                   </div>
@@ -294,7 +294,7 @@ const App: React.FC = () => {
             </div>
 
             {/* My Tools Section */}
-            <section className="mb-10">
+            <section className="mb-10 px-2">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center space-x-3">
                   <div className="w-1 h-5 bg-emerald-500 rounded-full"></div>
@@ -322,7 +322,7 @@ const App: React.FC = () => {
                   管理工具 <Icon name="PlusCircle" size={12} className="ml-1" />
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4">
                 {myTools.map(tool => (
                   <ToolCard 
                     key={tool.id} 
@@ -351,7 +351,7 @@ const App: React.FC = () => {
             </section>
 
             {/* Hot Tools Section */}
-            <section className="mb-12 pb-12">
+            <section className="mb-12 pb-12 px-2">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center space-x-3">
                   <div className="w-1 h-5 bg-blue-600 rounded-full"></div>
@@ -364,7 +364,7 @@ const App: React.FC = () => {
                   查看全部 <Icon name="ChevronRight" size={12} className="ml-1" />
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4">
                 {hotTools.map(tool => (
                   <ToolCard 
                     key={tool.id} 

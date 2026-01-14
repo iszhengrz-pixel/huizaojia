@@ -20,8 +20,8 @@ const DateCalculatorView: React.FC = () => {
   const endRef1 = useRef<HTMLInputElement>(null);
   const startRef2 = useRef<HTMLInputElement>(null);
 
-  // 热门工具筛选（前4个）
-  const hotTools = ALL_TOOLS.filter(t => t.isHot).slice(0, 4);
+  // 热门工具筛选（获取前6个，展示规范与首页一致）
+  const hotTools = ALL_TOOLS.filter(t => t.isHot).slice(0, 6);
 
   // Results for Tab 1
   const [results1, setResults1] = useState({
@@ -104,8 +104,8 @@ const DateCalculatorView: React.FC = () => {
   }, [startDate2, daysOffset, direction]);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-50 p-6 lg:p-10 scroll-smooth">
-      {/* 顶部内容区域：限制宽度为 max-w-4xl 保持计算器专注度 */}
+    <div className="flex-1 overflow-y-auto bg-slate-50 p-6 lg:p-10 scroll-smooth custom-scrollbar">
+      {/* 顶部日期计算器主体：维持原状，采用居中最大宽度限制 */}
       <div className="max-w-4xl mx-auto space-y-10 mb-16">
         {/* Header */}
         <div className="flex items-center space-x-4 mb-2">
@@ -127,7 +127,7 @@ const DateCalculatorView: React.FC = () => {
             <h2 className="text-lg font-bold text-slate-800">工期计算</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 relative z-10">
             <div className="space-y-6">
               <div className="group">
                 <label className="block text-sm font-semibold text-slate-500 mb-2 ml-1">开始日期</label>
@@ -198,25 +198,25 @@ const DateCalculatorView: React.FC = () => {
               <div>
                 <label className="block text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-2">总工期结果</label>
                 <div className="flex items-baseline space-x-2">
-                  <span className="text-5xl font-black text-blue-600 tracking-tight">{results1.total}</span>
-                  <span className="text-slate-400 font-bold text-lg">天</span>
+                  <span className="text-6xl font-black text-blue-600 tracking-tight">{results1.total}</span>
+                  <span className="text-slate-400 font-bold text-xl">天</span>
                 </div>
-                <p className="text-[11px] text-slate-500 mt-4 font-bold bg-white/80 p-3 rounded-xl border border-slate-100 inline-block shadow-sm">{results1.breakdown}</p>
+                <p className="text-[12px] text-slate-500 mt-6 font-bold bg-white/80 p-4 rounded-xl border border-slate-100 inline-block shadow-sm">{results1.breakdown}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200/60">
+              <div className="grid grid-cols-2 gap-8 pt-8 border-t border-slate-200/60">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">工作日</label>
+                  <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-wider">工作日</label>
                   <div className="flex items-baseline space-x-1">
-                    <span className="text-2xl font-black text-slate-800">{results1.workDays}</span>
-                    <span className="text-xs text-slate-500 font-medium">天</span>
+                    <span className="text-3xl font-black text-slate-800">{results1.workDays}</span>
+                    <span className="text-sm text-slate-500 font-medium">天</span>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-wider">节假日/周末</label>
+                  <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-wider">节假日/周末</label>
                   <div className="flex items-baseline space-x-1">
-                    <span className="text-2xl font-black text-slate-800">{results1.holidayDays}</span>
-                    <span className="text-xs text-slate-500 font-medium">天</span>
+                    <span className="text-3xl font-black text-slate-800">{results1.holidayDays}</span>
+                    <span className="text-sm text-slate-500 font-medium">天</span>
                   </div>
                 </div>
               </div>
@@ -231,7 +231,7 @@ const DateCalculatorView: React.FC = () => {
             <h2 className="text-lg font-bold text-slate-800">日期推算</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
              <div className="space-y-6">
               <div className="group">
                 <label className="block text-sm font-semibold text-slate-500 mb-2 ml-1">开始日期</label>
@@ -274,13 +274,13 @@ const DateCalculatorView: React.FC = () => {
                 <div className="flex bg-slate-100 p-1.5 rounded-2xl shrink-0">
                   <button 
                     onClick={() => setDirection('backward')}
-                    className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all ${direction === 'backward' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-6 py-3 rounded-xl text-xs font-black transition-all ${direction === 'backward' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     向前
                   </button>
                   <button 
                     onClick={() => setDirection('forward')}
-                    className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all ${direction === 'forward' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
+                    className={`px-6 py-3 rounded-xl text-xs font-black transition-all ${direction === 'forward' ? 'bg-white text-emerald-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     向后
                   </button>
@@ -290,37 +290,38 @@ const DateCalculatorView: React.FC = () => {
 
             <div className="bg-emerald-50/40 rounded-[28px] p-8 flex flex-col items-center justify-center text-center border border-emerald-100/50 backdrop-blur-sm">
                <label className="block text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-4">推算结果日期</label>
-               <div className="bg-white px-8 py-8 rounded-[24px] shadow-sm border border-emerald-100 w-full group hover:scale-[1.02] transition-all duration-300">
-                  <div className="text-xl md:text-2xl font-black text-slate-800 group-hover:text-emerald-600 transition-colors">
+               <div className="bg-white px-8 py-10 rounded-[24px] shadow-sm border border-emerald-100 w-full group hover:scale-[1.01] transition-all duration-300">
+                  <div className="text-2xl md:text-3xl font-black text-slate-800 group-hover:text-emerald-600 transition-colors">
                     {resultDate2}
                   </div>
                </div>
-               <button className="mt-6 text-emerald-600 text-xs font-black flex items-center hover:text-emerald-700 group/link transition-colors">
+               <button className="mt-8 text-emerald-600 text-sm font-black flex items-center hover:text-emerald-700 group/link transition-colors">
                  查看 {new Date(resultDate2).getFullYear() || new Date().getFullYear()}年 日历表 
-                 <Icon name="Calendar" size={14} className="ml-1.5 group-hover/link:translate-x-0.5 transition-transform" />
+                 <Icon name="Calendar" size={16} className="ml-2 group-hover/link:translate-x-0.5 transition-transform" />
                </button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 热门工具推荐模块：扩展至 max-w-7xl 沿用主页设计规范，占满宽度并自适应 */}
-      <div className="max-w-7xl mx-auto px-4 lg:px-0">
-        <section className="pt-8 pb-16 border-t border-slate-200/60">
+      {/* 热门工具推荐区域：通栏展示，与首页规范保持一致 */}
+      <div className="w-full">
+        <section className="pt-10 pb-16 border-t border-slate-200/60 px-2">
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center space-x-3">
               <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">热门工具推荐</h2>
-              <p className="hidden sm:block text-slate-400 text-sm ml-4 font-medium">为您甄选最高频使用的造价神器</p>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">热门推荐</h2>
             </div>
+            <button className="text-xs text-blue-600 font-bold hover:text-blue-800 flex items-center transition-colors outline-none">
+               查看全部 <Icon name="ChevronRight" size={14} className="ml-1" />
+            </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4">
             {hotTools.map(tool => (
               <ToolCard 
                 key={tool.id} 
                 tool={tool} 
                 onClick={() => {
-                  // 通过 URL 刷新或状态提升来处理更好，这里仅作点击反馈
                   alert(`即将为您启动: ${tool.name}`);
                 }} 
               />
