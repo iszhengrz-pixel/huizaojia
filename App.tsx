@@ -269,7 +269,7 @@ const App: React.FC = () => {
                         onClick={handleHomeAISend}
                         className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-lg flex items-center justify-center shadow-md shadow-blue-500/10 hover:scale-105 active:scale-95 transition-all outline-none"
                       >
-                        <Icon name="Send" size={16} />
+                        <Icon name="Mic" size={16} />
                       </button>
                     </div>
                   </div>

@@ -25,18 +25,7 @@ interface ComparisonRow {
   isHeader?: boolean;
 }
 
-// Map field keys to display names for the sidebar logic
-const FIELD_NAMES: Record<keyof CostDetail, string> = {
-  labor: '人工费',
-  material: '材料(设备)费',
-  machinery: '机械费',
-  management: '管理费',
-  profit: '利润',
-  subtotal: '小计',
-  total: '合计(元)'
-};
-
-const MOCK_DATA: ComparisonRow[] = [
+const INITIAL_MOCK_DATA: ComparisonRow[] = [
   { id: 'h-0104', index: '', code: '', name: '0104 砌筑工程', unit: '', quantity: '', contract: {} as any, audit: {} as any, isHeader: true },
   {
     id: 'row-1', index: '1', code: '4-1换', name: 'MU20混凝土实心砖基础 DMM20砂浆砌筑(砖胎膜)', unit: 'm3', quantity: 7.65,
@@ -68,26 +57,6 @@ const MOCK_DATA: ComparisonRow[] = [
     contract: { labor: 1170.25, material: 4670.15, machinery: 9.19, management: 195.43, profit: 95.53, subtotal: 6231.77, total: 11591 },
     audit: { labor: 1162.5, material: 4670.15, machinery: 9.19, management: 194.15, profit: 94.91, subtotal: 6221.52, total: 11572 },
   },
-  {
-    id: 'row-4', index: '4', code: '12-16换', name: '保护墙外侧20厚DP15.0干混防水砂浆防潮层', unit: 'm2', quantity: 60.75,
-    contract: { labor: 11.65, material: 11.75, machinery: 0.22, management: 1.97, profit: 0.96, subtotal: 27.47, total: 1669 },
-    audit: { labor: 11.58, material: 11.75, machinery: 0.22, management: 1.95, profit: 0.96, subtotal: 27.37, total: 1663 },
-  },
-  {
-    id: 'row-4-sub', index: '', code: '9-43换', name: '防水砂浆立面~干混抹灰砂浆DP M15.0', unit: '100m2', quantity: '0.60752322', isSubRow: true,
-    contract: { labor: 1165.27, material: 1175.2, machinery: 21.65, management: 196.67, profit: 96.14, subtotal: 2746.73, total: 1669 },
-    audit: { labor: 1157.55, material: 1175.2, machinery: 21.65, management: 195.39, profit: 95.52, subtotal: 2736.51, total: 1662 },
-  },
-  {
-    id: 'row-5', index: '5', code: '4-68', name: '聚氨酯 (PU) 发泡剂嵌缝', unit: 'm', quantity: 26.3,
-    contract: { labor: 4.23, material: 6.43, machinery: 0, management: 0.7, profit: 0.34, subtotal: 12.03, total: 316 },
-    audit: { labor: 4.2, material: 6.43, machinery: 0, management: 0.7, profit: 0.34, subtotal: 11.99, total: 315 },
-  },
-  {
-    id: 'row-5-sub', index: '', code: '4-68', name: '聚氨酯 (PU) 发泡剂嵌缝', unit: '100m', quantity: 0.263, isSubRow: true,
-    contract: { labor: 422.8, material: 642.84, machinery: 0, management: 70.06, profit: 34.25, subtotal: 1202.65, total: 316 },
-    audit: { labor: 420, material: 642.84, machinery: 0, management: 69.59, profit: 34.02, subtotal: 1198.93, total: 315 },
-  },
   { id: 'h-0105', index: '', code: '', name: '0105 混凝土及钢筋混凝土工程', unit: '', quantity: '', contract: {} as any, audit: {} as any, isHeader: true },
   {
     id: 'row-6', index: '6', code: '5-1换', name: 'C20商品砼基础垫层浇捣', unit: 'm3', quantity: 89.21,
@@ -97,6 +66,7 @@ const MOCK_DATA: ComparisonRow[] = [
 ];
 
 const OKContractCompareView: React.FC = () => {
+  const [data, setData] = useState<ComparisonRow[]>(INITIAL_MOCK_DATA);
   const [isComparing, setIsComparing] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showCoinAnim, setShowCoinAnim] = useState(false);
@@ -105,9 +75,38 @@ const OKContractCompareView: React.FC = () => {
   const [auditFile, setAuditFile] = useState<string | null>(null);
   
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState<'contract' | 'audit'>('contract');
-  
-  const tableRef = useRef<HTMLDivElement>(null);
+  const [showAnalysisSidebar, setShowAnalysisSidebar] = useState(true);
+  const [menuOpenSide, setMenuOpenSide] = useState<'contract' | 'audit' | null>(null);
+
+  const [visibleFields, setVisibleFields] = useState({
+    labor: true,
+    material: false,
+    machinery: false,
+    management: false,
+    profit: false
+  });
+
+  const toggleField = (field: keyof typeof visibleFields) => {
+    setVisibleFields(prev => ({ ...prev, [field]: !prev[field] }));
+  };
+
+  const activeFieldsCount = Object.values(visibleFields).filter(Boolean).length;
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleCellEdit = (rowId: string, side: 'contract' | 'audit', field: keyof CostDetail, value: string) => {
+    const numVal = parseFloat(value) || 0;
+    setData(prev => prev.map(row => {
+      if (row.id === rowId) {
+        const targetSide = { ...row[side] };
+        (targetSide as any)[field] = numVal;
+        targetSide.subtotal = targetSide.labor + targetSide.material + targetSide.machinery + targetSide.management + targetSide.profit;
+        const qty = typeof row.quantity === 'string' ? parseFloat(row.quantity) || 0 : row.quantity;
+        targetSide.total = Math.round(targetSide.subtotal * qty);
+        return { ...row, [side]: targetSide };
+      }
+      return row;
+    }));
+  };
 
   const handleCompare = () => {
     if (!contractFile || !auditFile) return;
@@ -120,300 +119,311 @@ const OKContractCompareView: React.FC = () => {
     }, 1200);
   };
 
-  const scrollToRow = (id: string, tab: 'contract' | 'audit') => {
-    setActiveTab(tab);
-    setHighlightedRow(id);
-    setTimeout(() => {
-      const element = document.getElementById(id);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
+  const scrollToSide = (id: string, side: 'contract' | 'audit' | 'diff') => {
+    const targetId = `${id}_${side}`;
+    setHighlightedRow(targetId);
+    const element = document.getElementById(targetId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }
     setTimeout(() => setHighlightedRow(null), 3000);
   };
 
-  const renderCell = (valCurrent: number, valOther: number) => {
+  const renderCell = (
+    valCurrent: number, 
+    valOther: number, 
+    isEditable: boolean = false, 
+    rowId?: string, 
+    side?: 'contract' | 'audit', 
+    field?: keyof CostDetail
+  ) => {
     if (valCurrent === undefined) return '';
-    const isDiff = valCurrent !== valOther;
+    const isDiff = Math.abs(valCurrent - valOther) > 0.001;
+    
+    if (isEditable && rowId && side && field) {
+      return (
+        <input 
+          type="number"
+          value={valCurrent || ''}
+          onChange={(e) => handleCellEdit(rowId, side, field, e.target.value)}
+          className={`w-full bg-transparent border-none outline-none text-right focus:ring-1 focus:ring-blue-400 rounded transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none whitespace-nowrap px-1 text-xs ${isDiff ? 'text-red-600 font-bold' : 'text-slate-600'}`}
+        />
+      );
+    }
+
     return (
-      <span className={`inline-block px-2 py-1 rounded transition-colors ${isDiff ? 'bg-red-50 text-red-600 font-bold' : 'text-slate-600'}`}>
-        {valCurrent === 0 && valOther === 0 ? '' : valCurrent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      <span className={`inline-block w-full px-1 py-1 rounded transition-colors whitespace-nowrap text-right text-xs ${isDiff ? 'bg-red-50 text-red-600 font-bold' : 'text-slate-600'}`}>
+        {valCurrent === 0 && valOther === 0 ? '0.00' : valCurrent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </span>
     );
   };
 
-  const renderTable = (type: 'contract' | 'audit') => {
+  const renderFilterMenu = (side: 'contract' | 'audit') => (
+    <>
+      <div className="fixed inset-0 z-40 bg-transparent" onClick={(e) => { e.stopPropagation(); setMenuOpenSide(null); }}></div>
+      <div 
+        className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white border border-slate-200 rounded-2xl shadow-[0_15px_40px_rgba(0,0,0,0.15)] p-4 w-48 animate-in fade-in zoom-in-95 duration-200"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center space-x-2 mb-3 px-1">
+          <Icon name="Filter" size={12} className="text-blue-500" />
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">科目筛选</p>
+        </div>
+        <div className="space-y-2">
+          {[
+            { key: 'labor', label: '人工费' },
+            { key: 'material', label: '材料费' },
+            { key: 'machinery', label: '机械费' },
+            { key: 'management', label: '管理费' },
+            { key: 'profit', label: '利润' }
+          ].map(item => (
+            <label key={item.key} className="flex items-center space-x-3 cursor-pointer group px-1 py-0.5 rounded-lg hover:bg-slate-50 transition-colors">
+              <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${visibleFields[item.key as keyof typeof visibleFields] ? 'bg-blue-600 border-blue-600' : 'border-slate-300 group-hover:border-blue-400'}`}>
+                {visibleFields[item.key as keyof typeof visibleFields] && <Icon name="Check" size={10} className="text-white" strokeWidth={4} />}
+              </div>
+              <input type="checkbox" className="hidden" checked={visibleFields[item.key as keyof typeof visibleFields]} onChange={() => toggleField(item.key as keyof typeof visibleFields)} />
+              <span className={`text-xs font-bold transition-colors ${visibleFields[item.key as keyof typeof visibleFields] ? 'text-blue-600' : 'text-slate-500 group-hover:text-slate-800'}`}>{item.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+
+  const renderUnifiedTable = () => {
+    const feeColSpan = activeFieldsCount + 1; // 子科目 + 小计
+    const contractTotalCols = feeColSpan + 1; // 合计列
+    const auditTotalCols = feeColSpan + 1;
+    const totalCols = 5 + contractTotalCols + auditTotalCols + 2; 
+
     return (
-      <div className="flex-1 overflow-auto bg-white custom-scrollbar">
-        <table className="w-full text-left border-collapse min-w-[1400px]">
-          <thead className="sticky top-0 z-20 shadow-sm">
-            <tr className="bg-slate-50 border-b border-slate-300">
-              <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r border-slate-300 text-center w-12">清单序号</th>
-              <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r border-slate-300 w-28">项目编码(定额编码)</th>
-              <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r border-slate-300 w-[400px]">清单(定额)项目名称</th>
-              <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r border-slate-300 text-center w-20">计量单位</th>
-              <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r border-slate-300 text-right w-24">数量</th>
-              <th colSpan={6} className="px-3 py-2 text-xs font-black text-slate-700 text-center border-b border-slate-300 border-r border-slate-300">
-                综合单价 (元)
-              </th>
-              <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 text-right w-28">合计(元)</th>
-            </tr>
-            <tr className="bg-slate-50 border-b border-slate-300">
-              <th className="px-3 py-2 text-[10px] font-bold text-slate-600 text-right w-24 border-r border-slate-200">人工费</th>
-              <th className="px-3 py-2 text-[10px] font-bold text-slate-600 text-right w-24 border-r border-slate-200">材料(设备)费</th>
-              <th className="px-3 py-2 text-[10px] font-bold text-slate-600 text-right w-24 border-r border-slate-200">机械费</th>
-              <th className="px-3 py-2 text-[10px] font-bold text-slate-600 text-right w-24 border-r border-slate-200">管理费</th>
-              <th className="px-3 py-2 text-[10px] font-bold text-slate-600 text-right w-24 border-r border-slate-200">利润</th>
-              <th className="px-3 py-2 text-[10px] font-bold text-slate-600 text-right w-24 border-r border-slate-300">小计</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {MOCK_DATA.map((row) => {
-              if (row.isHeader) {
-                return (
-                  <tr key={row.id} className="bg-slate-50/80">
-                    <td className="px-3 py-2 border-r border-slate-200"></td>
-                    <td className="px-3 py-2 border-r border-slate-200"></td>
-                    <td colSpan={10} className="px-4 py-2 text-xs font-black text-slate-800 tracking-wide uppercase">{row.name}</td>
-                  </tr>
-                );
-              }
-              const current = type === 'contract' ? row.contract : row.audit;
-              const other = type === 'contract' ? row.audit : row.contract;
+      <table className="w-auto text-left border-collapse table-auto bg-white rounded-2xl shadow-sm">
+        <thead className="sticky top-0 z-20 shadow-sm">
+          {/* 第一层表头 */}
+          <tr className="bg-slate-100 border-b border-slate-300">
+            <th colSpan={5} className="px-3 py-2 text-xs font-black text-slate-500 border-r border-slate-200">项目基础信息</th>
+            <th colSpan={contractTotalCols} className="px-3 py-2 text-center text-xs font-black text-blue-800 bg-blue-50 border-r-2 border-r-blue-200 uppercase tracking-widest">合同价 (原始)</th>
+            <th colSpan={auditTotalCols} className="px-3 py-2 text-center text-xs font-black text-emerald-800 bg-emerald-50 border-r-2 border-r-emerald-200 uppercase tracking-widest">送审价 (比对)</th>
+            <th colSpan={2} className="px-3 py-2 text-center text-xs font-black text-red-800 bg-red-50 uppercase tracking-widest">对比差异统计</th>
+          </tr>
+          {/* 第二层表头 */}
+          <tr className="bg-slate-50 border-b border-slate-300">
+            <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r border-slate-200 text-center whitespace-nowrap">清单序号</th>
+            <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r border-slate-200 whitespace-nowrap">项目编码</th>
+            <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r border-slate-300 whitespace-nowrap min-w-[200px]">项目名称</th>
+            <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r border-slate-200 text-center whitespace-nowrap">单位</th>
+            <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 border-r-2 border-r-slate-300 text-right whitespace-nowrap">数量</th>
+            
+            {/* 合同价子项头 */}
+            <th colSpan={feeColSpan} className="px-3 py-2 text-[10px] font-black text-blue-600 text-center border-b border-slate-200 border-r border-slate-200 relative whitespace-nowrap bg-blue-50/30">
+              <div className="flex items-center justify-center space-x-1">
+                <span>综合单价 (元)</span>
+                <button onClick={() => setMenuOpenSide(menuOpenSide === 'contract' ? null : 'contract')} className={`p-0.5 rounded transition-colors outline-none ${menuOpenSide === 'contract' ? 'bg-blue-600 text-white' : 'hover:bg-blue-100 text-blue-600'}`}>
+                  <Icon name="Settings2" size={12} />
+                </button>
+              </div>
+              {menuOpenSide === 'contract' && renderFilterMenu('contract')}
+            </th>
+            <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 text-right border-r-2 border-r-blue-200 whitespace-nowrap bg-blue-50/30">合计(元)</th>
+
+            {/* 送审价子项头 */}
+            <th colSpan={feeColSpan} className="px-3 py-2 text-[10px] font-black text-emerald-600 text-center border-b border-slate-200 border-r border-slate-200 relative whitespace-nowrap bg-emerald-50/30">
+              <div className="flex items-center justify-center space-x-1">
+                <span>综合单价 (元)</span>
+                <button onClick={() => setMenuOpenSide(menuOpenSide === 'audit' ? null : 'audit')} className={`p-0.5 rounded transition-colors outline-none ${menuOpenSide === 'audit' ? 'bg-emerald-600 text-white' : 'hover:bg-emerald-100 text-emerald-600'}`}>
+                  <Icon name="Settings2" size={12} />
+                </button>
+              </div>
+              {menuOpenSide === 'audit' && renderFilterMenu('audit')}
+            </th>
+            <th rowSpan={2} className="px-3 py-3 text-xs font-black text-slate-700 text-right border-r-2 border-r-emerald-200 whitespace-nowrap bg-emerald-50/30">合计(元)</th>
+
+            {/* 差异统计头 */}
+            <th rowSpan={2} className="px-3 py-2 text-xs font-bold text-slate-600 text-right border-r border-slate-200 whitespace-nowrap bg-red-50/50">小计差异</th>
+            <th rowSpan={2} className="px-3 py-2 text-xs font-bold text-slate-600 text-right bg-red-50/50">合计差异</th>
+          </tr>
+          {/* 第三层：明细科目表头 */}
+          <tr className="bg-slate-50 border-b border-slate-300 text-right">
+            {/* 合同子科目头 */}
+            {visibleFields.labor && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-blue-50/10">人工费</th>}
+            {visibleFields.material && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-blue-50/10">材料费</th>}
+            {visibleFields.machinery && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-blue-50/10">机械费</th>}
+            {visibleFields.management && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-blue-50/10">管理费</th>}
+            {visibleFields.profit && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-blue-50/10">利润</th>}
+            <th className="px-3 py-2 text-[10px] font-bold text-slate-500 border-r border-slate-200 whitespace-nowrap bg-blue-100/30">小计</th>
+
+            {/* 送审子科目头 */}
+            {visibleFields.labor && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-emerald-50/10">人工费</th>}
+            {visibleFields.material && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-emerald-50/10">材料费</th>}
+            {visibleFields.machinery && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-emerald-50/10">机械费</th>}
+            {visibleFields.management && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-emerald-50/10">管理费</th>}
+            {visibleFields.profit && <th className="w-[80px] px-2 py-2 text-[10px] font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap bg-emerald-50/10">利润</th>}
+            <th className="px-3 py-2 text-[10px] font-bold text-slate-500 border-r border-slate-200 whitespace-nowrap bg-emerald-100/30">小计</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-200">
+          {data.map((row) => {
+            if (row.isHeader) {
               return (
-                <tr 
-                  key={row.id} 
-                  id={row.id}
-                  className={`hover:bg-blue-50/40 transition-all duration-300 ${row.isSubRow ? 'bg-slate-50/20' : 'bg-white'} ${highlightedRow === row.id ? 'bg-yellow-50 ring-2 ring-yellow-400 z-10' : ''}`}
-                >
-                  <td className="px-3 py-3 text-xs text-center font-bold text-slate-500 border-r border-slate-100">{row.index}</td>
-                  <td className="px-3 py-3 text-xs font-medium text-slate-600 border-r border-slate-100">{row.code}</td>
-                  <td className={`px-4 py-3 text-xs font-bold text-slate-800 border-r border-slate-100 leading-relaxed ${row.isSubRow ? 'pl-10 font-medium text-slate-600' : ''}`}>
-                    {row.name}
-                  </td>
-                  <td className="px-3 py-3 text-xs text-center text-slate-500 border-r border-slate-100">{row.unit}</td>
-                  <td className="px-3 py-3 text-xs text-right font-medium text-slate-700 border-r border-slate-100">{row.quantity}</td>
-                  <td className="px-3 py-3 text-xs text-right border-r border-slate-100">{renderCell(current.labor, other.labor)}</td>
-                  <td className="px-3 py-3 text-xs text-right border-r border-slate-100">{renderCell(current.material, other.material)}</td>
-                  <td className="px-3 py-3 text-xs text-right border-r border-slate-100">{renderCell(current.machinery, other.machinery)}</td>
-                  <td className="px-3 py-3 text-xs text-right border-r border-slate-100">{renderCell(current.management, other.management)}</td>
-                  <td className="px-3 py-3 text-xs text-right border-r border-slate-100">{renderCell(current.profit, other.profit)}</td>
-                  <td className="px-3 py-3 text-xs text-right border-r border-slate-200 bg-slate-50/30">{renderCell(current.subtotal, other.subtotal)}</td>
-                  <td className="px-3 py-3 text-xs text-right font-black text-slate-900 bg-slate-50/10">
-                    {renderCell(current.total, other.total)}
-                  </td>
+                <tr key={row.id} className="bg-slate-100/80">
+                  <td colSpan={totalCols} className="px-4 py-2 text-[11px] font-black text-slate-800 tracking-wide uppercase border-r border-slate-300 whitespace-nowrap">{row.name}</td>
                 </tr>
               );
-            })}
-          </tbody>
-        </table>
-      </div>
+            }
+
+            const diffSubtotal = row.audit.subtotal - row.contract.subtotal;
+            const diffTotal = row.audit.total - row.contract.total;
+
+            return (
+              <tr key={row.id} className={`hover:bg-blue-50/20 transition-all duration-300 ${row.isSubRow ? 'bg-slate-50/30' : 'bg-white'}`}>
+                {/* 基础信息组 */}
+                <td className="px-3 py-3 text-xs text-center font-bold text-slate-400 border-r border-slate-100 whitespace-nowrap">{row.index}</td>
+                <td className="px-3 py-3 text-xs font-medium text-slate-500 border-r border-slate-100 whitespace-nowrap">{row.code}</td>
+                <td className={`px-4 py-3 text-xs font-bold text-slate-800 border-r border-slate-300 leading-relaxed whitespace-nowrap ${row.isSubRow ? 'pl-10 font-medium text-slate-600 italic' : ''}`}>{row.name}</td>
+                <td className="px-3 py-3 text-xs text-center text-slate-400 border-r border-slate-100 whitespace-nowrap">{row.unit}</td>
+                <td className="px-3 py-3 text-xs text-right font-medium text-slate-700 border-r-2 border-r-slate-300 whitespace-nowrap">{row.quantity}</td>
+
+                {/* 合同价子项数据 */}
+                {visibleFields.labor && <td className={`w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap ${highlightedRow === `${row.id}_contract` ? 'bg-blue-100 ring-2 ring-blue-400 z-10' : ''}`}>{renderCell(row.contract.labor, row.audit.labor, true, row.id, 'contract', 'labor')}</td>}
+                {visibleFields.material && <td className="w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap">{renderCell(row.contract.material, row.audit.material, true, row.id, 'contract', 'material')}</td>}
+                {visibleFields.machinery && <td className="w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap">{renderCell(row.contract.machinery, row.audit.machinery, true, row.id, 'contract', 'machinery')}</td>}
+                {visibleFields.management && <td className="w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap">{renderCell(row.contract.management, row.audit.management, true, row.id, 'contract', 'management')}</td>}
+                {visibleFields.profit && <td className="w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap">{renderCell(row.contract.profit, row.audit.profit, true, row.id, 'contract', 'profit')}</td>}
+                <td className="px-3 py-3 text-xs text-right border-r border-slate-200 bg-slate-50/30 whitespace-nowrap font-medium text-slate-600">{renderCell(row.contract.subtotal, row.audit.subtotal)}</td>
+                <td className="px-3 py-3 text-xs text-right font-black text-slate-900 border-r-2 border-r-blue-200 whitespace-nowrap bg-blue-50/10">{renderCell(row.contract.total, row.audit.total)}</td>
+
+                {/* 送审价子项数据 */}
+                {visibleFields.labor && <td className={`w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap ${highlightedRow === `${row.id}_audit` ? 'bg-emerald-100 ring-2 ring-emerald-400 z-10' : ''}`}>{renderCell(row.audit.labor, row.contract.labor, true, row.id, 'audit', 'labor')}</td>}
+                {visibleFields.material && <td className="w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap">{renderCell(row.audit.material, row.contract.material, true, row.id, 'audit', 'material')}</td>}
+                {visibleFields.machinery && <td className="w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap">{renderCell(row.audit.machinery, row.contract.machinery, true, row.id, 'audit', 'machinery')}</td>}
+                {visibleFields.management && <td className="w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap">{renderCell(row.audit.management, row.contract.management, true, row.id, 'audit', 'management')}</td>}
+                {visibleFields.profit && <td className="w-[80px] px-1 py-3 text-right border-r border-slate-100 whitespace-nowrap">{renderCell(row.audit.profit, row.contract.profit, true, row.id, 'audit', 'profit')}</td>}
+                <td className="px-3 py-3 text-xs text-right border-r border-slate-200 bg-slate-50/30 whitespace-nowrap font-medium text-slate-600">{renderCell(row.audit.subtotal, row.contract.subtotal)}</td>
+                <td className="px-3 py-3 text-xs text-right font-black text-slate-900 border-r-2 border-r-emerald-200 whitespace-nowrap bg-emerald-50/10">{renderCell(row.audit.total, row.contract.total)}</td>
+
+                {/* 差异统计数据 */}
+                <td id={`${row.id}_diff`} className={`px-3 py-3 text-xs text-right border-r border-slate-200 font-black whitespace-nowrap ${highlightedRow === `${row.id}_diff` ? 'bg-red-50 ring-2 ring-red-400 z-10 shadow-sm' : 'bg-red-50/10'}`}>
+                   <span className={Math.abs(diffSubtotal) > 0.001 ? 'text-red-600' : 'text-slate-400'}>
+                     {diffSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                   </span>
+                </td>
+                <td className="px-3 py-3 text-xs text-right font-black whitespace-nowrap bg-red-50/10">
+                   <span className={Math.abs(diffTotal) > 0.001 ? 'text-red-600' : 'text-slate-400'}>
+                     {diffTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                   </span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     );
   };
 
   return (
     <div className="flex flex-col h-full bg-[#f0f2f5] overflow-hidden relative font-sans text-slate-900">
-      {/* 金币入库全屏动画 */}
       {showCoinAnim && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/20 backdrop-blur-[2px] pointer-events-none animate-in fade-in duration-200">
           <div className="bg-white rounded-[40px] p-12 shadow-2xl flex flex-col items-center animate-in zoom-in-50 duration-300 border-[6px] border-yellow-400 relative">
             <div className="absolute inset-0 bg-yellow-400/5 rounded-[34px] animate-pulse"></div>
-            <div className="relative mb-8">
-              <div className="w-28 h-28 bg-gradient-to-tr from-yellow-600 via-yellow-400 to-yellow-200 rounded-full flex items-center justify-center animate-gold shadow-[0_0_30px_rgba(234,179,8,0.5)]">
-                <Icon name="Coins" size={56} className="text-white drop-shadow-md" />
-              </div>
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className={`absolute top-0 left-0 animate-ping`} style={{ animationDelay: `${i * 100}ms`, transform: `translate(${Math.sin(i) * 60}px, ${Math.cos(i) * 60}px)` }}>
-                  <Icon name="CircleDollarSign" size={20} className="text-yellow-500 opacity-60" />
-                </div>
-              ))}
-            </div>
-            <div className="text-center relative z-10">
-              <h2 className="text-4xl font-black text-slate-800 mb-2 tracking-tight">对比任务完成!</h2>
-              <div className="flex items-center justify-center space-x-3 bg-yellow-50 px-6 py-3 rounded-2xl border border-yellow-100">
-                <span className="text-5xl font-black text-yellow-600 drop-shadow-sm">+3</span>
-                <div className="text-left">
-                  <div className="text-lg font-black text-yellow-700 leading-tight">COINS</div>
-                  <div className="text-[10px] font-bold text-yellow-600 uppercase">Deposited</div>
-                </div>
-              </div>
-            </div>
+            <div className="relative mb-8"><div className="w-28 h-28 bg-gradient-to-tr from-yellow-600 via-yellow-400 to-yellow-200 rounded-full flex items-center justify-center animate-gold shadow-[0_0_30px_rgba(234,179,8,0.5)]"><Icon name="Coins" size={56} className="text-white drop-shadow-md" /></div></div>
+            <div className="text-center relative z-10"><h2 className="text-4xl font-black text-slate-800 mb-2 tracking-tight">对比任务完成!</h2></div>
           </div>
         </div>
       )}
 
-      {/* 顶部输入区 */}
-      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm z-10">
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm z-30">
         <div className="flex items-center space-x-6 flex-1">
           <div className="flex items-center space-x-3 bg-slate-50 p-2 rounded-2xl border border-slate-100">
              <div className="px-4 py-1.5 text-sm font-bold text-slate-700 bg-white rounded-xl shadow-sm">合同价 (原始文件)</div>
-             <button 
-               onClick={() => setContractFile('合同价_2024.xlsx')}
-               className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${contractFile ? 'bg-emerald-500 text-white shadow-md' : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-500/20'}`}
-             >
-               {contractFile ? '已导入' : '导入按钮'}
-             </button>
+             <button onClick={() => setContractFile('合同价.xlsx')} className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${contractFile ? 'bg-emerald-500 text-white shadow-md' : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-500/20'}`}>{contractFile ? '已导入' : '导入'}</button>
           </div>
           <div className="flex items-center space-x-3 bg-slate-50 p-2 rounded-2xl border border-slate-100">
              <div className="px-4 py-1.5 text-sm font-bold text-slate-700 bg-white rounded-xl shadow-sm">送审价 (被审文件)</div>
-             <button 
-               onClick={() => setAuditFile('送审价_V2.xlsx')}
-               className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${auditFile ? 'bg-emerald-500 text-white shadow-md' : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-500/20'}`}
-             >
-               {auditFile ? '已导入' : '导入按钮'}
-             </button>
+             <button onClick={() => setAuditFile('送审价.xlsx')} className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${auditFile ? 'bg-emerald-500 text-white shadow-md' : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-500/20'}`}>{auditFile ? '已导入' : '导入'}</button>
           </div>
         </div>
-
-        <button 
-          onClick={handleCompare}
-          disabled={!contractFile || !auditFile || isComparing}
-          className="ml-8 px-10 py-3 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 disabled:grayscale disabled:opacity-50"
-        >
-          {isComparing ? <Icon name="Loader2" className="animate-spin" /> : '价格对比按钮'}
-        </button>
+        <button onClick={handleCompare} disabled={!contractFile || !auditFile || isComparing} className="ml-8 px-10 py-3 bg-blue-600 text-white font-black text-sm rounded-2xl shadow-xl shadow-blue-500/20 hover:bg-blue-700 transition-all active:scale-95 disabled:grayscale disabled:opacity-50 tracking-widest uppercase">{isComparing ? <Icon name="Loader2" className="animate-spin" /> : '开始对比'}</button>
       </div>
 
       <div className="flex-1 flex overflow-hidden relative">
-        {/* 对比记录栏 */}
         <div className={`bg-white border-r border-slate-200 flex flex-col shrink-0 transition-all duration-300 ${isSidebarCollapsed ? 'w-12' : 'w-56'}`}>
           <div className="px-4 py-4 border-b border-slate-100 flex items-center justify-between overflow-hidden">
             {!isSidebarCollapsed && <span className="text-xs font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">对比记录栏</span>}
-            <button 
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-1 hover:bg-slate-50 rounded-lg text-slate-300 transition-colors"
-            >
+            <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="p-1 hover:bg-slate-50 rounded-lg text-slate-300 transition-colors">
               <Icon name={isSidebarCollapsed ? 'PanelLeftOpen' : 'PanelLeftClose'} size={16} />
             </button>
           </div>
           {!isSidebarCollapsed && (
-            <div className="flex-1 overflow-y-auto p-3 space-y-2 animate-in fade-in duration-300">
-              {['记录1: 2#-g地块地下室', '记录2: 1#楼主体', '记录3: 景观绿化'].map((rec, i) => (
+            <div className="flex-1 overflow-y-auto p-3 space-y-4 animate-in fade-in duration-300">
+              {[
+                { name: '记录1: 2#-g地块地下室', time: '2024-05-20 14:00' },
+                { name: '记录2: 1#楼主体', time: '2024-05-20 14:00' },
+                { name: '记录3: 景观绿化', time: '2024-05-20 14:00' }
+              ].map((rec, i) => (
                 <div key={i} className="group p-3 rounded-xl border border-transparent hover:border-blue-100 hover:bg-blue-50/30 cursor-pointer transition-all">
-                  <p className="text-xs font-bold text-slate-700 group-hover:text-blue-600">{rec}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">2024-05-20 14:00</p>
+                  <p className="text-xs font-bold text-slate-700 group-hover:text-blue-600 truncate mb-1">{rec.name}</p>
+                  <p className="text-[10px] text-slate-400 group-hover:text-blue-400 font-medium">{rec.time}</p>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* 主对比显示区 */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
           {!showResults ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-4">
-              <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center border-2 border-dashed border-slate-200">
-                <Icon name="Layout" size={40} className="opacity-20" />
-              </div>
-              <p className="font-bold text-sm">请先导入文件并点击“价格对比按钮”</p>
-            </div>
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-4"><Icon name="Layout" size={40} className="opacity-20" /><p className="font-bold text-sm">请先导入文件并点击“开始对比”</p></div>
           ) : (
-            <div className="flex-1 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-700">
-              {/* Tab Container */}
-              <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center space-x-3 shrink-0">
-                <button 
-                  onClick={() => setActiveTab('contract')}
-                  className={`px-8 py-2.5 text-sm font-black transition-all rounded-2xl flex items-center space-x-2 ${
-                    activeTab === 'contract' 
-                      ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/30' 
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                  }`}
-                >
-                  <Icon name="FileText" size={16} />
-                  <span>合同价 (原始)</span>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('audit')}
-                  className={`px-8 py-2.5 text-sm font-black transition-all rounded-2xl flex items-center space-x-2 ${
-                    activeTab === 'audit' 
-                      ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/30' 
-                      : 'bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-                  }`}
-                >
-                  <Icon name="FileCheck" size={16} />
-                  <span>送审价 (比对)</span>
-                </button>
-              </div>
-
-              {/* Red box section removed per user request */}
-              
-              <div ref={tableRef} className="flex-1 flex flex-col overflow-hidden">
-                {activeTab === 'contract' ? renderTable('contract') : renderTable('audit')}
+            <div ref={tableContainerRef} className="flex-1 overflow-auto custom-scrollbar bg-slate-100 p-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="min-w-full inline-block align-middle">
+                 {renderUnifiedTable()}
               </div>
             </div>
           )}
         </div>
 
-        {/* AI 差异分析 Sidebar */}
         {showResults && (
-          <div className="w-80 bg-white border-l border-slate-200 flex flex-col shrink-0 animate-in fade-in slide-in-from-right-4 duration-500">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Icon name="BrainCircuit" size={20} className="text-blue-600" />
-                <span className="font-bold text-sm text-slate-800">AI 差异分析</span>
+          <div className={`bg-white border-l border-slate-200 flex flex-col shrink-0 transition-all duration-300 ${showAnalysisSidebar ? 'w-80' : 'w-0 overflow-hidden'}`}>
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-2 overflow-hidden">
+                <Icon name="BrainCircuit" size={20} className="text-blue-600 shrink-0" />
+                <span className="font-bold text-sm text-slate-800 whitespace-nowrap uppercase tracking-tight">AI 差异分析</span>
               </div>
+              <button onClick={() => setShowAnalysisSidebar(false)} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400">
+                <Icon name="PanelRightClose" size={18} />
+              </button>
             </div>
-
-            <div className="flex-1 overflow-y-auto custom-scrollbar bg-white p-4 space-y-4">
-               <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100 mb-2">
-                  <h4 className="text-xs font-black text-blue-600 mb-2">对比摘要</h4>
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-white p-4 space-y-6">
+               <div className="bg-blue-50/50 rounded-2xl p-4 border border-blue-100 mb-2 shadow-sm">
+                  <h4 className="text-xs font-black text-blue-600 mb-3 border-b border-blue-100 pb-2">对比摘要</h4>
                   <div className="space-y-2">
-                     <div className="flex justify-between text-xs">
-                        <span className="text-slate-500">总差异项</span>
-                        <span className="font-black text-red-600">8 项</span>
-                     </div>
-                     <div className="flex justify-between text-xs">
-                        <span className="text-slate-500">累计核减</span>
-                        <span className="font-black text-emerald-600">¥ 158.00</span>
-                     </div>
+                    <div className="flex justify-between text-xs"><span className="text-slate-500 font-bold">总差异项</span><span className="font-black text-red-600">8 项</span></div>
+                    <div className="flex justify-between text-xs"><span className="text-slate-500 font-bold">累计核减</span><span className="font-black text-emerald-600">¥ 158.00</span></div>
                   </div>
                </div>
-
                <div className="space-y-4">
-                  <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">差异明细定位</h4>
-                  {MOCK_DATA.filter(r => !r.isHeader && r.contract.total !== r.audit.total).map((row, i) => {
-                    // Find the first field that differs to show in the sidebar
-                    const diffField = (Object.keys(row.contract) as Array<keyof CostDetail>).find(
-                      key => row.contract[key] !== row.audit[key]
-                    ) || 'total';
-                    const fieldName = FIELD_NAMES[diffField];
-                    const diffVal = (row.contract[diffField] - row.audit[diffField]).toFixed(2);
-
+                  <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4">差异明细定位</h4>
+                  {data.filter(r => !r.isHeader && (Math.abs(r.contract.labor - r.audit.labor) > 0.1)).map((row) => {
+                    const diffValue = row.contract.labor - row.audit.labor;
                     return (
-                      <div 
-                        key={row.id}
-                        className="group border border-slate-100 rounded-xl overflow-hidden bg-white hover:border-blue-200 shadow-sm transition-all"
-                      >
-                        {/* Header Item Name */}
-                        <div className="p-3 bg-slate-50/50 border-b border-slate-100">
-                          <p className="text-[11px] font-bold text-slate-800 leading-tight">
-                            <span className="text-blue-500 mr-2">{row.code}</span>
-                            {row.name}
-                          </p>
+                      <div key={row.id} className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-sm transition-all relative flex flex-col group/item">
+                        <div className="p-4 border-b border-slate-50">
+                           <p className="text-[11px] font-bold text-slate-800 leading-tight truncate">
+                              <span className="text-blue-500 mr-2">{row.code}</span>
+                              {row.name}
+                           </p>
                         </div>
-
-                        {/* Contract Row */}
-                        <button 
-                          onClick={() => scrollToRow(row.id, 'contract')}
-                          className="w-full text-left px-3 py-2 flex items-center border-l-4 border-l-blue-400 hover:bg-blue-50/50 transition-colors"
-                        >
-                          <span className="text-[10px] text-slate-500 flex-1 truncate">合同价: {fieldName}</span>
-                          <span className="text-[11px] font-black text-slate-700">¥ {row.contract[diffField].toFixed(2)}</span>
-                        </button>
-
-                        {/* Audit Row */}
-                        <button 
-                          onClick={() => scrollToRow(row.id, 'audit')}
-                          className="w-full text-left px-3 py-2 flex items-center border-l-4 border-l-emerald-400 hover:bg-emerald-50/50 transition-colors border-t border-slate-50"
-                        >
-                          <span className="text-[10px] text-slate-500 flex-1 truncate">送审价: {fieldName}</span>
-                          <span className="text-[11px] font-black text-slate-700">¥ {row.audit[diffField].toFixed(2)}</span>
-                        </button>
-
-                        {/* Difference Row */}
-                        <div className="px-3 py-2 flex items-center border-l-4 border-l-red-400 bg-red-50/30 border-t border-slate-50">
-                          <span className="text-[10px] text-red-500 font-bold flex-1">差异值</span>
-                          <span className="text-[11px] font-black text-red-600">¥ {diffVal}</span>
+                        <div onClick={() => scrollToSide(row.id, 'contract')} className="flex items-center justify-between px-4 py-3 border-l-4 border-l-blue-500 hover:bg-blue-50 cursor-pointer transition-colors">
+                           <span className="text-[11px] font-medium text-slate-500">合同价定位</span>
+                           <span className="text-[11px] font-black text-slate-800">¥ {row.contract.labor.toFixed(2)}</span>
+                        </div>
+                        <div onClick={() => scrollToSide(row.id, 'audit')} className="flex items-center justify-between px-4 py-3 border-l-4 border-l-emerald-500 border-t border-t-slate-50 hover:bg-emerald-50 cursor-pointer transition-colors">
+                           <span className="text-[11px] font-medium text-slate-500">送审价定位</span>
+                           <span className="text-[11px] font-black text-slate-800">¥ {row.audit.labor.toFixed(2)}</span>
+                        </div>
+                        <div onClick={() => scrollToSide(row.id, 'diff')} className="flex items-center justify-between px-4 py-3 border-l-4 border-l-red-500 border-t border-t-slate-50 bg-red-50 hover:bg-red-100 cursor-pointer transition-colors">
+                           <span className="text-[11px] font-bold text-red-500 uppercase tracking-tighter">差异值定位</span>
+                           <span className="text-[11px] font-black text-red-600">¥ {Math.abs(diffValue).toFixed(2)}</span>
                         </div>
                       </div>
                     );
@@ -422,27 +432,20 @@ const OKContractCompareView: React.FC = () => {
             </div>
           </div>
         )}
+        
+        {!showAnalysisSidebar && showResults && (
+           <button onClick={() => setShowAnalysisSidebar(true)} className="absolute right-0 top-1/2 -translate-y-1/2 w-8 h-20 bg-white border border-slate-200 border-r-0 rounded-l-xl shadow-lg flex items-center justify-center text-slate-400 hover:text-blue-600 transition-all z-40">
+             <Icon name="PanelRightOpen" size={18} />
+           </button>
+        )}
       </div>
       
-      {/* 底部状态栏 */}
       <div className="h-10 bg-white border-t border-slate-200 px-6 flex items-center justify-between shrink-0">
-        <div className="flex items-center space-x-8">
-          <div className="flex items-center space-x-2 text-[10px] font-bold text-slate-400">
-            <div className="w-4 h-2 bg-red-50 border border-red-200 rounded shadow-sm"></div>
-            <span>存在差异项 (红字红底)</span>
-          </div>
-          <div className="flex items-center space-x-2 text-[10px] font-bold text-slate-400">
-            <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-              <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
-              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-            </div>
-            <span>点击差异项可跳转定位</span>
-          </div>
+        <div className="flex items-center space-x-6 text-[10px] font-bold text-slate-400">
+          <div className="flex items-center space-x-1"><div className="w-2 h-2 bg-red-400 rounded-full"></div><span>存在差异项 (红字对比)</span></div>
+          <div className="flex items-center space-x-1"><Icon name="Keyboard" size={12} className="text-blue-400" /><span>支持单元格内数值实时修改与动态重算</span></div>
         </div>
-        <div className="text-[10px] font-black text-slate-300 italic uppercase tracking-widest">
-          HUIZAOJIA AI AUDIT ENGINE V3.0
-        </div>
+        <div className="text-[10px] font-black text-slate-300 italic uppercase tracking-widest">HUIZAOJIA AI AUDIT ENGINE V3.0</div>
       </div>
     </div>
   );
