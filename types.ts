@@ -6,6 +6,8 @@ export interface ToolItem {
   icon: string;
   category: string;
   isHot?: boolean;
+  pricingType?: 'free' | 'paid'; // 定价类型：免费或付费
+  isActivated?: boolean;        // 是否已激活/开通
   tutorial?: {
     overview: string;
     steps: string[];

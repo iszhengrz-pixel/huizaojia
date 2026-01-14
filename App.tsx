@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Icon from './components/Icon';
@@ -83,7 +84,7 @@ const App: React.FC = () => {
     return (
       <div className="bg-white border-b border-slate-200 px-8 py-4 flex items-center justify-between shrink-0 z-10">
         <div className="flex items-center space-x-4">
-          <button onClick={() => setActiveId('home')} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+          <button onClick={() => setActiveId('home')} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all outline-none">
             <Icon name="ArrowLeft" size={24} />
           </button>
           <h1 className="text-xl font-bold text-slate-900">{title}</h1>
@@ -92,7 +93,7 @@ const App: React.FC = () => {
           {tool && (
             <button 
               onClick={(e) => openTutorialModal(tool, e)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl font-bold text-sm transition-all"
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl font-bold text-sm transition-all outline-none"
             >
               <Icon name="BookOpen" size={18} />
               <span>教程</span>
@@ -100,7 +101,7 @@ const App: React.FC = () => {
           )}
           <button 
             onClick={(e) => toggleFavorite(toolId, e)}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl font-bold text-sm transition-all outline-none ${
               isFav ? 'bg-amber-50 text-amber-600' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
             }`}
           >
@@ -110,7 +111,7 @@ const App: React.FC = () => {
           {tool && (
             <button 
               onClick={(e) => openShareModal(tool, e)}
-              className="flex items-center space-x-2 px-4 py-2 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-xl font-bold text-sm transition-all"
+              className="flex items-center space-x-2 px-4 py-2 bg-slate-50 text-slate-500 hover:bg-slate-100 rounded-xl font-bold text-sm transition-all outline-none"
             >
               <Icon name="Share2" size={18} />
               <span>分享</span>
@@ -207,18 +208,18 @@ const App: React.FC = () => {
             {/* Minimalist AI Dialogue Hero (Further Reduced Height & Enhanced Background) */}
             <div className="py-7 flex flex-col items-center relative transition-all duration-300">
               {/* Enhanced Background Glows */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-blue-400/10 blur-[90px] rounded-full pointer-events-none"></div>
-              <div className="absolute top-10 left-[30%] w-[300px] h-[300px] bg-purple-400/10 blur-[100px] rounded-full pointer-events-none"></div>
-              <div className="absolute top-[-20px] right-[30%] w-[250px] h-[250px] bg-indigo-400/10 blur-[80px] rounded-full pointer-events-none"></div>
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-blue-400/20 blur-[90px] rounded-full pointer-events-none"></div>
+              <div className="absolute top-10 left-[30%] w-[300px] h-[300px] bg-purple-400/15 blur-[100px] rounded-full pointer-events-none"></div>
+              <div className="absolute top-[-20px] right-[30%] w-[250px] h-[250px] bg-indigo-400/15 blur-[80px] rounded-full pointer-events-none"></div>
 
-              {/* The "Pearl" Orb (Further Optimized) */}
+              {/* The "Pearl" Orb */}
               <div className="relative mb-4 w-14 h-14 transition-all duration-300">
                 <div className="absolute inset-0 bg-gradient-to-tr from-blue-500 via-indigo-300 to-white rounded-full opacity-90 blur-[1px] shadow-inner animate-pulse"></div>
                 <div className="absolute inset-[2px] bg-gradient-to-bl from-white/90 via-transparent to-black/10 rounded-full"></div>
                 <div className="absolute top-2 left-4 w-3 h-1.5 bg-white/70 blur-[3px] rounded-full rotate-45"></div>
               </div>
 
-              {/* Typography Greeting (More Compact) */}
+              {/* Typography Greeting */}
               <div className="text-center mb-6 relative z-10 transition-all duration-300">
                 <h1 className="text-[28px] font-bold text-slate-800 tracking-tight leading-tight mb-0.5">
                   {greeting}，造价工程师
@@ -239,25 +240,25 @@ const App: React.FC = () => {
                       onChange={(e) => setHomeAIInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleHomeAISend()}
                       placeholder="发起咨询或向 AI 发送指令..."
-                      className="flex-1 bg-transparent border-none focus:ring-0 text-sm font-medium text-slate-700 placeholder-slate-400"
+                      className="flex-1 bg-transparent border-none outline-none focus:outline-none focus:ring-0 text-sm font-medium text-slate-700 placeholder-slate-400"
                     />
                   </div>
 
                   <div className="flex items-center justify-between px-3 pb-2 pt-0.5">
                     <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar pb-1">
-                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all">
+                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none">
                         <Icon name="Paperclip" size={13} className="text-slate-400" />
                         <span className="text-[10px] font-bold text-slate-500">识图算量</span>
                       </button>
-                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all">
+                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none">
                         <Icon name="Search" size={13} className="text-slate-400" />
                         <span className="text-[10px] font-bold text-slate-500">查定额</span>
                       </button>
-                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all">
+                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none">
                         <Icon name="BrainCircuit" size={13} className="text-slate-400" />
                         <span className="text-[10px] font-bold text-slate-500">AI推理</span>
                       </button>
-                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all">
+                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none">
                         <Icon name="FileSearch" size={13} className="text-slate-400" />
                         <span className="text-[10px] font-bold text-slate-500">深度研究</span>
                       </button>
@@ -266,7 +267,7 @@ const App: React.FC = () => {
                     <div className="flex items-center space-x-2 shrink-0 ml-3">
                       <button 
                         onClick={handleHomeAISend}
-                        className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-lg flex items-center justify-center shadow-md shadow-blue-500/10 hover:scale-105 active:scale-95 transition-all"
+                        className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-lg flex items-center justify-center shadow-md shadow-blue-500/10 hover:scale-105 active:scale-95 transition-all outline-none"
                       >
                         <Icon name="Mic" size={16} />
                       </button>
@@ -274,7 +275,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Sub Tags (Quick Suggestions - More Compact) */}
+                {/* Sub Tags */}
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
                   {['2024清单变化', '深基坑支护定额', '土石方计算公式', '苗木表清单编制'].map((tag) => (
                     <button 
@@ -283,7 +284,7 @@ const App: React.FC = () => {
                         setHomeAIInput(tag);
                         handleHomeAISend();
                       }}
-                      className="px-3 py-1 rounded-xl text-[11px] font-bold text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all"
+                      className="px-3 py-1 rounded-xl text-[11px] font-bold text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-all outline-none"
                     >
                       {tag}
                     </button>
@@ -303,7 +304,7 @@ const App: React.FC = () => {
                       <button
                         key={tab}
                         onClick={() => setMyToolsActiveTab(tab)}
-                        className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all ${
+                        className={`px-3 py-1 text-[11px] font-bold rounded-md transition-all outline-none ${
                           myToolsActiveTab === tab 
                             ? 'bg-white text-blue-600 shadow-sm' 
                             : 'text-slate-500 hover:text-slate-700'
@@ -316,7 +317,7 @@ const App: React.FC = () => {
                 </div>
                 <button 
                   onClick={() => setView('tool-management')}
-                  className="text-xs text-blue-600 font-medium hover:text-blue-800 flex items-center transition-colors"
+                  className="text-xs text-blue-600 font-medium hover:text-blue-800 flex items-center transition-colors outline-none"
                 >
                   管理工具 <Icon name="PlusCircle" size={12} className="ml-1" />
                 </button>
@@ -326,6 +327,8 @@ const App: React.FC = () => {
                   <ToolCard 
                     key={tool.id} 
                     tool={tool} 
+                    onFavoriteToggle={(id, e) => toggleFavorite(id, e)}
+                    isFavorite={selectedToolIds.includes(tool.id)}
                     onClick={() => {
                       if(tool.id === 'ok-contract') handleSelect('pricing', 'ok-contract');
                       else if(tool.id === 'ok-date-calc') handleSelect('general', 'ok-date-calc');
@@ -356,7 +359,7 @@ const App: React.FC = () => {
                 </div>
                 <button 
                   onClick={() => setView('all-tools')}
-                  className="text-xs text-blue-600 font-medium hover:text-blue-800 flex items-center transition-colors"
+                  className="text-xs text-blue-600 font-medium hover:text-blue-800 flex items-center transition-colors outline-none"
                 >
                   查看全部 <Icon name="ChevronRight" size={12} className="ml-1" />
                 </button>
@@ -366,6 +369,8 @@ const App: React.FC = () => {
                   <ToolCard 
                     key={tool.id} 
                     tool={tool} 
+                    onFavoriteToggle={(id, e) => toggleFavorite(id, e)}
+                    isFavorite={selectedToolIds.includes(tool.id)}
                     onClick={() => {
                       if(tool.id === 'ai-vision') handleSelect('quantity', 'ai-vision');
                       else alert(`启动工具: ${tool.name}`);
@@ -389,7 +394,7 @@ const App: React.FC = () => {
           <p className="text-slate-500 mt-3 text-center max-w-xs">该功能模块正在深度集成 AI 算力中，预计将于近期开放使用。</p>
           <button 
             onClick={() => setActiveId('home')}
-            className="mt-8 px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 transform"
+            className="mt-8 px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20 active:scale-95 transform outline-none"
           >
             返回平台主页
           </button>
@@ -417,7 +422,7 @@ const App: React.FC = () => {
             <input
               type="text"
               placeholder="搜索工具、政策、清单、定额..."
-              className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-2 pl-12 pr-4 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition-all text-sm text-slate-700"
+              className="w-full bg-slate-50 border border-slate-100 rounded-2xl py-2 pl-12 pr-4 outline-none focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-400 transition-all text-sm text-slate-700"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -425,17 +430,17 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-2">
-          <button className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative">
+          <button className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all relative outline-none">
             <Icon name="Bell" size={20} />
             <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
           </button>
-          <button className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+          <button className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all outline-none">
             <Icon name="Settings" size={20} />
           </button>
           <div className="h-8 w-px bg-slate-200 mx-2"></div>
           <button 
             onClick={() => handleSelect('settings', 'profile')}
-            className="flex items-center space-x-3 pl-2 pr-1 py-1 hover:bg-slate-50 rounded-2xl transition-all group"
+            className="flex items-center space-x-3 pl-2 pr-1 py-1 hover:bg-slate-50 rounded-2xl transition-all group outline-none"
           >
             <div className="text-right hidden sm:block">
               <p className="text-xs font-bold text-slate-700 group-hover:text-blue-600">造价工程师</p>
@@ -471,7 +476,7 @@ const App: React.FC = () => {
                     <p className="text-blue-600 font-bold text-sm">功能介绍与使用说明</p>
                   </div>
                 </div>
-                <button onClick={() => setTutorialTool(null)} className="p-3 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-2xl transition-all">
+                <button onClick={() => setTutorialTool(null)} className="p-3 text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-2xl transition-all outline-none">
                   <Icon name="X" size={24} />
                 </button>
               </div>
@@ -492,7 +497,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
               </div>
-              <button onClick={() => setTutorialTool(null)} className="mt-10 w-full bg-slate-900 text-white py-4 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl">我知道了，开始使用</button>
+              <button onClick={() => setTutorialTool(null)} className="mt-10 w-full bg-slate-900 text-white py-4 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl outline-none">我知道了，开始使用</button>
             </div>
           </div>
         </div>
@@ -506,24 +511,24 @@ const App: React.FC = () => {
             <h3 className="text-2xl font-black text-slate-900 mb-2">分享 {sharingTool.name}</h3>
             <p className="text-slate-500 text-sm mb-8">邀请您的同事一起使用这款高效造价工具</p>
             <div className="w-full bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center space-x-3 mb-8">
-              <input type="text" readOnly value={`https://huizaojia.ai/tools/${sharingTool.id}`} className="flex-1 bg-transparent border-none focus:ring-0 text-sm font-medium text-slate-600" />
+              <input type="text" readOnly value={`https://huizaojia.ai/tools/${sharingTool.id}`} className="flex-1 bg-transparent border-none outline-none focus:ring-0 text-sm font-medium text-slate-600" />
               <button onClick={() => { navigator.clipboard.writeText(`https://huizaojia.ai/tools/${sharingTool.id}`); alert('链接已成功复制到剪贴板！'); }} className="bg-blue-600 text-white p-2.5 rounded-xl hover:bg-blue-700 transition-all active:scale-90"><Icon name="Copy" size={18} /></button>
             </div>
             <div className="grid grid-cols-2 gap-4 w-full">
-              <button className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all"><Icon name="MessageCircle" size={24} className="text-emerald-500 mb-2" /><span className="text-xs font-bold text-slate-600">微信分享</span></button>
-              <button className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all"><Icon name="Image" size={24} className="text-indigo-500 mb-2" /><span className="text-xs font-bold text-slate-600">生成海报</span></button>
+              <button className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all outline-none"><Icon name="MessageCircle" size={24} className="text-emerald-500 mb-2" /><span className="text-xs font-bold text-slate-600">微信分享</span></button>
+              <button className="flex flex-col items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all outline-none"><Icon name="Image" size={24} className="text-indigo-500 mb-2" /><span className="text-xs font-bold text-slate-600">生成海报</span></button>
             </div>
-            <button onClick={() => setSharingTool(null)} className="mt-10 text-slate-400 font-bold text-sm hover:text-slate-600 transition-all">取消</button>
+            <button onClick={() => setSharingTool(null)} className="mt-10 text-slate-400 font-bold text-sm hover:text-slate-600 transition-all outline-none">取消</button>
           </div>
         </div>
       )}
 
       {/* Floating Action Buttons */}
       <div className="fixed bottom-8 right-8 flex flex-col space-y-4">
-        <button className="w-14 h-14 bg-white text-slate-600 rounded-2xl shadow-xl border border-slate-100 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all transform hover:scale-110">
+        <button className="w-14 h-14 bg-white text-slate-600 rounded-2xl shadow-xl border border-slate-100 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all transform hover:scale-110 outline-none">
           <Icon name="Headset" size={24} />
         </button>
-        <button onClick={() => document.querySelector('main > div')?.scrollTo({top: 0, behavior: 'smooth'})} className="w-14 h-14 bg-white text-slate-600 rounded-2xl shadow-xl border border-slate-100 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all transform hover:scale-110">
+        <button onClick={() => document.querySelector('main > div')?.scrollTo({top: 0, behavior: 'smooth'})} className="w-14 h-14 bg-white text-slate-600 rounded-2xl shadow-xl border border-slate-100 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all transform hover:scale-110 outline-none">
           <Icon name="ArrowUp" size={24} />
         </button>
       </div>
