@@ -26,15 +26,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeId, activeSubId, onSelect }) =>
   };
 
   return (
-    <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen shrink-0">
-      <div className="p-6 flex items-center space-x-2">
-        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold">
-          汇
-        </div>
-        <span className="text-xl font-bold text-slate-800">汇造价</span>
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-4 pb-4">
+    <div className="w-64 bg-white border-r border-slate-200 flex flex-col h-full shrink-0">
+      <nav className="flex-1 overflow-y-auto px-4 py-6 custom-scrollbar">
         {NAVIGATION_MENU.map((item) => (
           <div key={item.id} className="mb-1">
             <button
@@ -84,17 +77,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeId, activeSubId, onSelect }) =>
           </div>
         ))}
       </nav>
-      
-      <div className="p-4 border-t border-slate-100">
-        <div className="bg-slate-50 rounded-lg p-3 flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-full bg-slate-300"></div>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-xs font-semibold text-slate-700 truncate">造价工程师</p>
-            <p className="text-[10px] text-slate-500 truncate">VIP 尊享工具箱</p>
-          </div>
-          <Icon name="LogOut" size={16} className="text-slate-400 cursor-pointer hover:text-red-500" />
-        </div>
-      </div>
     </div>
   );
 };

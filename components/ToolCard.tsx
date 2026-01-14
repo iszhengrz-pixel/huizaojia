@@ -9,9 +9,21 @@ interface ToolCardProps {
   selectable?: boolean;
   selected?: boolean;
   onToggle?: (e: React.MouseEvent) => void;
+  onShare?: (tool: ToolItem, e: React.MouseEvent) => void;
+  isFavorite?: boolean;
+  onFavoriteToggle?: (toolId: string, e: React.MouseEvent) => void;
 }
 
-const ToolCard: React.FC<ToolCardProps> = ({ tool, onClick, selectable, selected, onToggle }) => {
+const ToolCard: React.FC<ToolCardProps> = ({ 
+  tool, 
+  onClick, 
+  selectable, 
+  selected, 
+  onToggle,
+  onShare,
+  isFavorite,
+  onFavoriteToggle
+}) => {
   const getIconColor = (id: string) => {
     const colors = [
       'bg-blue-50 text-blue-600',
@@ -22,7 +34,6 @@ const ToolCard: React.FC<ToolCardProps> = ({ tool, onClick, selectable, selected
       'bg-purple-50 text-purple-600',
       'bg-cyan-50 text-cyan-600',
     ];
-    // Simple deterministic color choice
     const index = (tool.name.length + (tool.id.length)) % colors.length;
     return colors[index];
   };
@@ -49,27 +60,49 @@ const ToolCard: React.FC<ToolCardProps> = ({ tool, onClick, selectable, selected
         </p>
       </div>
 
-      {/* Action / Selectable Area */}
-      {selectable ? (
-        <div 
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle?.(e);
-          }}
-          className={`shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
-            selected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 bg-white group-hover:border-blue-400'
-          }`}
-        >
-          {selected && <Icon name="Check" size={14} strokeWidth={3} />}
-        </div>
-      ) : (
-        /* Decorative Arrow (Appears on Hover) */
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity translate-x-2 group-hover:translate-x-0 duration-300">
-          <Icon name="ChevronRight" size={16} className="text-blue-400" />
-        </div>
-      )}
+      {/* Actions */}
+      <div className="flex items-center space-x-1">
+        {onFavoriteToggle && !selectable && (
+          <button
+            onClick={(e) => onFavoriteToggle(tool.id, e)}
+            className={`p-1.5 rounded-lg transition-all ${
+              isFavorite ? 'text-amber-500 bg-amber-50' : 'text-slate-300 hover:text-amber-500 hover:bg-amber-50 opacity-0 group-hover:opacity-100'
+            }`}
+            title={isFavorite ? "取消收藏" : "加入收藏"}
+          >
+            <Icon name="Star" size={16} fill={isFavorite ? "currentColor" : "none"} />
+          </button>
+        )}
+        
+        {onShare && !selectable && (
+          <button
+            onClick={(e) => onShare(tool, e)}
+            className="p-1.5 rounded-lg text-slate-300 hover:text-blue-500 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all"
+            title="分享工具"
+          >
+            <Icon name="Share2" size={16} />
+          </button>
+        )}
+
+        {selectable ? (
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle?.(e);
+            }}
+            className={`shrink-0 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${
+              selected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 bg-white group-hover:border-blue-400'
+            }`}
+          >
+            {selected && <Icon name="Check" size={14} strokeWidth={3} />}
+          </div>
+        ) : (
+          <div className="text-slate-200 group-hover:text-blue-400 group-hover:translate-x-1 transition-all duration-300">
+            <Icon name="ChevronRight" size={16} />
+          </div>
+        )}
+      </div>
       
-      {/* Hot Badge */}
       {tool.isHot && (
         <div className="absolute top-0 right-0 pointer-events-none">
           <div className="bg-red-500 text-white text-[9px] px-2 py-0.5 rounded-bl-lg font-bold shadow-sm">

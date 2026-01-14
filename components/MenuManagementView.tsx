@@ -64,7 +64,7 @@ const MOCK_DATA: MenuData[] = [
         status: 'normal', 
         createTime: '2026-01-12 09:30:00',
         children: [
-          { id: '311', name: 'ok工期计算器', icon: '#', order: 1, permKey: 'app:calc:duration', path: '', status: 'normal', createTime: '2026-01-12 09:35:00' },
+          { id: '311', name: '工期计算器', icon: '#', order: 1, permKey: 'app:calc:duration', path: '', status: 'normal', createTime: '2026-01-12 09:35:00' },
           { id: '312', name: '节假日信息维护', icon: '#', order: 2, permKey: 'app:holiday:mgt', path: '', status: 'normal', createTime: '2026-01-12 09:36:00' },
         ]
       }

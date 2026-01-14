@@ -111,7 +111,7 @@ const DateCalculatorView: React.FC = () => {
             <Icon name="CalendarDays" size={28} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">ok日期计算器</h1>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">日期计算器</h1>
             <p className="text-slate-500 text-sm">精准计算工期、工作日及日期推算</p>
           </div>
         </div>

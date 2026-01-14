@@ -60,7 +60,7 @@ const TaxCalculatorView: React.FC = () => {
               <Icon name="Calculator" size={28} />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">OK税费计算</h1>
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">税费计算</h1>
               <p className="text-slate-500 text-sm">专业的含税/不含税金额互转工具</p>
             </div>
           </div>
@@ -79,7 +79,7 @@ const TaxCalculatorView: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 1: 含税金额输入 */}
+        {/* Section 1: 含税金额 input */}
         <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-40 h-40 bg-blue-50/30 rounded-full -mr-20 -mt-20 group-hover:scale-110 transition-transform duration-700 pointer-events-none"></div>
           
@@ -164,7 +164,7 @@ const TaxCalculatorView: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 2: 不含税金额输入 */}
+        {/* Section 2: 不含税金额 input */}
         <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-50/30 rounded-full -mr-20 -mt-20 group-hover:scale-110 transition-transform duration-700 pointer-events-none"></div>
           

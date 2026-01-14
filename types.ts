@@ -6,6 +6,11 @@ export interface ToolItem {
   icon: string;
   category: string;
   isHot?: boolean;
+  tutorial?: {
+    overview: string;
+    steps: string[];
+    tips?: string[];
+  };
 }
 
 export interface MenuItem {
