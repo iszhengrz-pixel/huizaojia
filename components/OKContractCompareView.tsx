@@ -623,7 +623,7 @@ const OKContractCompareView: React.FC = () => {
       {/* Config Modal */}
       {showConfigModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setShowConfigModal(false)}>
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between"><h3 className="text-lg font-medium text-slate-700">比对配置</h3><button onClick={() => setShowConfigModal(false)} className="text-slate-400 hover:text-slate-600"><Icon name="X" size={20} /></button></div>
              <div className="flex-1 overflow-y-auto p-8 max-h-[70vh] custom-scrollbar">
                 <table className="w-full text-left border-collapse">
@@ -699,8 +699,8 @@ const OKContractCompareView: React.FC = () => {
                    ))}
                  </div>
                  
-                 {/* 搜索框与筛选设置 */}
-                 <div className="flex items-center px-4 shrink-0 space-x-3">
+                 {/* 搜索框 */}
+                 <div className="flex items-center px-4 shrink-0">
                     <div className="relative group">
                         <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                         <input 
@@ -718,16 +718,6 @@ const OKContractCompareView: React.FC = () => {
                             <Icon name="X" size={14} />
                           </button>
                         )}
-                    </div>
-                    {/* 工具栏筛选按钮 */}
-                    <div className="relative">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === 'toolbar' ? null : 'toolbar'); }}
-                          className={`w-10 h-10 border rounded-xl flex items-center justify-center transition-all ${menuOpenId === 'toolbar' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50 hover:text-blue-500'}`}
-                        >
-                            <Icon name="Settings2" size={18} />
-                        </button>
-                        {menuOpenId === 'toolbar' && renderFilterMenu()}
                     </div>
                  </div>
               </div>
