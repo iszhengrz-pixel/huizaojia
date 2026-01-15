@@ -1,4 +1,3 @@
-
 import { MenuItem, ToolItem } from './types';
 
 export const NAVIGATION_MENU: MenuItem[] = [
@@ -90,7 +89,25 @@ export const ALL_TOOLS_CATEGORIZED: ToolCategory[] = [
       { id: 'material-diff', name: '材料调差', icon: 'TrendingUp', category: '汇计价' },
       { id: 'fee-standards', name: '前后期收费标准库', icon: 'LibraryBig', category: '汇计价' },
       { id: 'ai-plant-list', name: 'AI苗木表编清单', icon: 'Sprout', category: '汇计价' },
-      { id: 'ok-contract', name: '合同价对比', icon: 'FileDiff', category: '汇计价', isHot: true },
+      { 
+        id: 'ok-contract', 
+        name: '合同价对比', 
+        icon: 'FileDiff', 
+        category: '汇计价', 
+        isHot: true,
+        tutorial: {
+          overview: "智能化的合同价与审核价对比工具，支持海量清单项的毫秒级匹配与差异化分析。",
+          steps: [
+            "分别导入'原始文件'与'审核文件'（支持.xlsx格式）",
+            "点击'开始智能对比'，系统将自动基于项目编码与名称进行行级对齐",
+            "在表头使用'齿轮'图标筛选需要重点关注的费用项（如人工费、材料费）",
+            "按住鼠标左键'拖拽拉框'，可实时汇总选区内的数值总额",
+            "右键点击任意单元格，可设置颜色标记，便于后续核查复核",
+            "点击最左侧'垃圾桶'图标可删除不再参与对比的清单行"
+          ],
+          tips: ["差异项会自动标红显示", "双击数值单元格可进入快速编辑模式，实时重新计算合价差额"]
+        }
+      },
       { id: 'price-file-compare', name: '计价文件对比', icon: 'Files', category: '汇计价' },
     ]
   },
