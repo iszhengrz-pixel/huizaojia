@@ -73,9 +73,8 @@ const App: React.FC = () => {
 
   const toolTabs = ['全部', '汇计量', '汇计价', '汇通用'];
 
-  const handleHomeAISend = () => {
-    if (!homeAIInput.trim()) return;
-    handleSelect('ai-qa', 'qa-2024-list');
+  const handleHomeAISend = (subId: string = 'qa-2024-list') => {
+    handleSelect('ai-qa', subId);
   };
 
   const renderToolHeader = (title: string, toolId: string) => {
@@ -246,30 +245,42 @@ const App: React.FC = () => {
 
                   <div className="flex items-center justify-between px-3 pb-2 pt-0.5">
                     <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar pb-1">
-                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none">
-                        <Icon name="Paperclip" size={13} className="text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-500">识图算量</span>
+                      <button 
+                        onClick={() => handleHomeAISend('qa-2024-list')}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none"
+                      >
+                        <Icon name="ClipboardList" size={13} className="text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-500">清单咨询</span>
                       </button>
-                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none">
-                        <Icon name="Search" size={13} className="text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-500">查定额</span>
+                      <button 
+                        onClick={() => handleHomeAISend('qa-quota')}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none"
+                      >
+                        <Icon name="HelpCircle" size={13} className="text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-500">定额解释</span>
                       </button>
-                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none">
-                        <Icon name="BrainCircuit" size={13} className="text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-500">AI推理</span>
+                      <button 
+                        onClick={() => handleHomeAISend('qa-indicators')}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none"
+                      >
+                        <Icon name="BarChart3" size={13} className="text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-500">指标数据</span>
                       </button>
-                      <button className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none">
-                        <Icon name="FileSearch" size={13} className="text-slate-400" />
-                        <span className="text-[10px] font-bold text-slate-500">深度研究</span>
+                      <button 
+                        onClick={() => handleHomeAISend('qa-policy')}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-full hover:bg-white hover:border-blue-200 hover:text-blue-600 transition-all outline-none"
+                      >
+                        <Icon name="FileText" size={13} className="text-slate-400" />
+                        <span className="text-[10px] font-bold text-slate-500">政策文件</span>
                       </button>
                     </div>
 
                     <div className="flex items-center space-x-2 shrink-0 ml-3">
                       <button 
-                        onClick={handleHomeAISend}
+                        onClick={() => handleHomeAISend()}
                         className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-lg flex items-center justify-center shadow-md shadow-blue-500/10 hover:scale-105 active:scale-95 transition-all outline-none"
                       >
-                        <Icon name="Mic" size={16} />
+                        <Icon name="Send" size={16} />
                       </button>
                     </div>
                   </div>

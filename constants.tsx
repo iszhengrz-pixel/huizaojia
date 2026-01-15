@@ -53,13 +53,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
       { id: 'user-management', label: '用户管理', parentId: 'settings' },
       { id: 'role-management', label: '角色管理', parentId: 'settings' },
       { id: 'menu-management', label: '菜单管理', parentId: 'settings' },
-      { id: 'survey', label: '问卷功能', parentId: 'settings' },
-      { id: 'register', label: '用户注册', parentId: 'settings' },
       { id: 'profile', label: '个人中心', parentId: 'settings' },
-      { id: 'payment', label: '支付管理', parentId: 'settings' },
-      { id: 'points', label: '积分管理', parentId: 'settings' },
-      { id: 'legal', label: '法律条款', parentId: 'settings' },
-      { id: 'customer-service', label: '客户服务', parentId: 'settings' },
     ]
   },
 ];
