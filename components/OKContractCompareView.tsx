@@ -22,25 +22,107 @@ interface SheetIdentification {
   previewData: any[];
 }
 
-interface ComparisonItem {
+interface PriceDetail {
+  source: string;
+  price: number;
+  isBaseline: boolean;
+  diff: number;
+}
+
+interface ComparisonResultItem {
   id: string;
   code: string;
   name: string;
   features: string;
   unit: string;
-  min: number;
-  max: number;
-  diff: number;
+  minPrice: number;
+  maxPrice: number;
+  diffPrice: number;
   sourceCount: number;
-  sources: {
-    fileName: string;
-    sheetName: string;
-    price: number;
-    isBaseline: boolean;
-  }[];
+  details: PriceDetail[];
 }
 
-// 初始模拟数据
+const MOCK_COMPARISON_DATA: ComparisonResultItem[] = [
+  {
+    id: 'c1',
+    code: '',
+    name: '0304 平时电气',
+    features: '',
+    unit: '',
+    minPrice: 1898144.37,
+    maxPrice: 1916119.37,
+    diffPrice: 17975.00,
+    sourceCount: 2,
+    details: []
+  },
+  {
+    id: 'c2',
+    code: '030404017001',
+    name: '配电箱',
+    features: '1、名称：成套配电箱安...',
+    unit: '台',
+    minPrice: 829.46,
+    maxPrice: 18804.46,
+    diffPrice: 17975.00,
+    sourceCount: 2,
+    details: [
+      { source: '测试用例-清单-合同价.xlsx - 表10.2.2-16 分部分项工程清单与计价表【地下室平时', price: 18804.46, isBaseline: false, diff: 17975.00 },
+      { source: '测试用例-清单-送审价.xlsx - 表10.2.2-16 分部分项工程清单与计价表【地下室平时', price: 829.46, isBaseline: true, diff: 0 }
+    ]
+  },
+  {
+    id: 'c3',
+    code: '030404017002',
+    name: '配电箱',
+    features: '1、名称：成套配电箱安...',
+    unit: '台',
+    minPrice: 17078.92,
+    maxPrice: 17078.92,
+    diffPrice: 0.00,
+    sourceCount: 2,
+    details: [
+      { source: '测试用例-清单-合同价.xlsx - 列表项', price: 17078.92, isBaseline: true, diff: 0 },
+      { source: '测试用例-清单-送审价.xlsx - 列表项', price: 17078.92, isBaseline: true, diff: 0 }
+    ]
+  },
+  {
+    id: 'c4',
+    code: '030404017003',
+    name: '配电箱',
+    features: '1、名称：成套配电箱安...',
+    unit: '台',
+    minPrice: 18640.92,
+    maxPrice: 18640.92,
+    diffPrice: 0.00,
+    sourceCount: 2,
+    details: []
+  },
+  {
+    id: 'c5',
+    code: '030404017004',
+    name: '配电箱',
+    features: '1、名称：成套配电箱安...',
+    unit: '台',
+    minPrice: 24004.92,
+    maxPrice: 24004.92,
+    diffPrice: 0.00,
+    sourceCount: 2,
+    details: []
+  },
+  {
+    id: 'c6',
+    code: '030404017005',
+    name: '配电箱',
+    features: '1、名称：成套配电箱安...',
+    unit: '台',
+    minPrice: 829.46,
+    maxPrice: 829.46,
+    diffPrice: 0.00,
+    sourceCount: 2,
+    details: []
+  }
+];
+
 const INITIAL_IDENTIFICATION_DATA: SheetIdentification[] = [
   {
     id: 's1',
@@ -92,26 +174,8 @@ const INITIAL_IDENTIFICATION_DATA: SheetIdentification[] = [
   }
 ];
 
-const MOCK_COMPARISON_DATA: ComparisonItem[] = [
-  {
-    id: 'c1',
-    code: '030404017001',
-    name: '配电箱',
-    features: '1、名称：成套配电箱安装...',
-    unit: '台',
-    min: 829.46,
-    max: 18804.46,
-    diff: 17975.00,
-    sourceCount: 2,
-    sources: [
-      { fileName: '测试用例-清单-送审价.xlsx', sheetName: '表10.2.2-16 分部分项工程清单与计价表【地下室平时】', price: 829.46, isBaseline: true },
-      { fileName: '测试用例-清单-合同价.xlsx', sheetName: '表10.2.2-16 分部分项工程清单与计价表【地下室平时】', price: 18804.46, isBaseline: false }
-    ]
-  }
-];
-
 const OKContractCompareView: React.FC = () => {
-  const [viewState, setViewState] = useState<'upload' | 'results' | 'detail' | 'comparison'>('upload');
+  const [viewState, setViewState] = useState<'upload' | 'results' | 'detail' | 'comparison-results'>('upload');
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isComparing, setIsComparing] = useState(false);
   const [activeFile, setActiveFile] = useState<UploadedFile | null>(null);
@@ -121,13 +185,15 @@ const OKContractCompareView: React.FC = () => {
   const activeSheet = identificationData.find(s => s.id === activeSheetId);
 
   const [expandedSheetRows, setExpandedSheetRows] = useState<Set<string>>(new Set());
-  const [expandedSidebarFiles, setExpandedSidebarFiles] = useState<Set<string>>(new Set());
-  const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set());
+  const [expandedResultRows, setExpandedResultRows] = useState<Set<string>>(new Set(['c2']));
+  const [expandedSidebarFiles, setExpandedSidebarFiles] = useState<Set<string>>(new Set(['f1', 'f2']));
+  const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set(['f1-s1', 'f2-s1']));
+  const [sidebarSearch, setSidebarSearch] = useState('');
 
   const handleUpload = () => {
     const isFirst = files.length === 0;
     const newFile: UploadedFile = {
-      id: isFirst ? 'original' : 'audit-' + Math.random().toString(36).substr(2, 4),
+      id: isFirst ? 'f1' : 'f2',
       name: isFirst ? '测试用例-清单-合同价.xlsx' : '测试用例-清单-送审价.xlsx',
       time: new Date().toLocaleString('zh-CN', { hour12: false }),
       type: isFirst ? 'original' : 'audit',
@@ -135,6 +201,24 @@ const OKContractCompareView: React.FC = () => {
       listCount: 1242
     };
     setFiles(prev => [...prev, newFile]);
+    setIsComparing(true);
+    setTimeout(() => {
+      setIsComparing(false);
+      setActiveFile(newFile);
+      setViewState('results');
+    }, 1200);
+  };
+
+  const startAnalysis = () => {
+    if (files.length < 2) {
+      alert('请先上传至少两份文件进行对比分析');
+      return;
+    }
+    setIsComparing(true);
+    setTimeout(() => {
+      setIsComparing(false);
+      setViewState('comparison-results');
+    }, 1500);
   };
 
   const toggleSidebarFile = (fileId: string) => {
@@ -144,28 +228,20 @@ const OKContractCompareView: React.FC = () => {
     setExpandedSidebarFiles(newExpanded);
   };
 
-  const toggleIsList = (id: string) => {
-    setIdentificationData(prev => prev.map(s => s.id === id ? { ...s, isList: !s.isList } : s));
+  const toggleResultRow = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newExpanded = new Set(expandedResultRows);
+    if (newExpanded.has(id)) newExpanded.delete(id);
+    else newExpanded.add(id);
+    setExpandedResultRows(newExpanded);
   };
 
-  const startAnalysis = () => {
-    if (files.length === 0) return;
-    setIsComparing(true);
-    const allSheetKeys = new Set<string>();
-    const allFileIds = new Set<string>();
-    files.forEach(file => {
-      allFileIds.add(file.id);
-      for (let i = 1; i <= file.sheetCount; i++) allSheetKeys.add(`${file.id}-${i}`);
-    });
-    setSelectedSheets(allSheetKeys);
-    setExpandedSidebarFiles(allFileIds);
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
-    setTimeout(() => {
-      setIsComparing(false);
-      // 按照用户需求，分析完成后进入识别结果页，默认查看最新上传的一个文件
-      setActiveFile(files[files.length - 1]);
-      setViewState('results');
-    }, 1500);
+  const toggleIsList = (id: string) => {
+    setIdentificationData(prev => prev.map(s => s.id === id ? { ...s, isList: !s.isList } : s));
   };
 
   const toggleSheetRow = (id: string) => {
@@ -175,7 +251,71 @@ const OKContractCompareView: React.FC = () => {
     setExpandedSheetRows(newSet);
   };
 
-  // --- 视图: 识别结果列表 ---
+  const renderUploadView = () => (
+    <div className="flex-1 overflow-y-auto bg-[#f8fafc] p-6 space-y-6 custom-scrollbar animate-in fade-in duration-300">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100"><h2 className="text-[14px] font-bold text-slate-800">Excel清单对比识别器</h2></div>
+        <div className="p-10 flex flex-col items-center">
+          <div onClick={handleUpload} className="w-full max-w-2xl border-2 border-dashed border-slate-100 rounded-[32px] py-16 flex flex-col items-center justify-center space-y-4 hover:bg-blue-50/30 hover:border-blue-300 transition-all cursor-pointer group">
+            <div className="w-16 h-16 bg-[#40a9ff] rounded-[20px] flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform">
+              <Icon name="CloudUpload" size={32} />
+            </div>
+            <div className="text-center">
+              <p className="text-base font-black text-slate-700">将Excel文件拖到此处，或<span className="text-blue-500">点击上传</span></p>
+              <p className="text-xs text-slate-400 mt-2 font-medium">支持 .xlsx, .xls 格式文件，单文件最大 20MB</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-h-[450px]">
+        <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-[14px] font-bold text-slate-800">已上传文件 ({files.length})</h2>
+          {files.length >= 2 && (
+            <button 
+              onClick={startAnalysis}
+              className="bg-blue-600 text-white px-5 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 transition-all flex items-center space-x-2 shadow-md outline-none"
+            >
+              <Icon name="Zap" size={14} />
+              <span>开始智能对比分析</span>
+            </button>
+          )}
+        </div>
+        <div className="p-4 space-y-1.5">
+          {files.map(file => (
+            <div key={file.id} className="relative pl-8">
+              <div className="absolute left-[3px] top-1.5 bottom-[-10px] w-px bg-slate-100 last:hidden" />
+              <div className="absolute left-0 top-1.5 w-2 h-2 bg-slate-200 rounded-full border-2 border-white" />
+              <div className="space-y-1">
+                <p className="text-[10px] text-slate-400 font-medium">{file.time}</p>
+                <div className="bg-white border border-slate-100 rounded-xl p-2.5 flex items-center justify-between group hover:shadow-sm hover:border-blue-100 transition-all">
+                  <div className="flex-1 flex items-center justify-between mr-4 min-w-0">
+                    <div className="flex items-center space-x-2 truncate">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${file.type === 'original' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}><Icon name={file.type === 'original' ? 'FileText' : 'FileCheck'} size={14} /></div>
+                      <h3 className="text-xs font-bold text-slate-700 truncate">{file.name}</h3>
+                    </div>
+                    <div className="flex items-center space-x-2 shrink-0 ml-4">
+                      <span className="bg-[#e6f7ff] text-[#1890ff] text-[10px] font-bold px-2 py-0.5 rounded">{file.sheetCount} Sheet</span>
+                      <span className="bg-[#f6ffed] text-[#52c41a] text-[10px] font-bold px-2 py-0.5 rounded">{file.listCount} 清单</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 shrink-0">
+                    <button onClick={() => { setActiveFile(file); setViewState('results'); }} className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition-all">查看</button>
+                    <button onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter(f => f.id !== file.id)); }} className="px-3 py-1 bg-rose-500 text-white rounded-lg text-[10px] font-bold hover:bg-rose-600 transition-all shadow-sm">移除</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {files.length === 0 && (
+            <div className="col-span-full py-20 text-center text-slate-300 italic text-sm">
+              暂未上传任何文件
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   const renderResultsView = () => (
     <div className="flex-1 flex flex-col h-full bg-[#f8fafc] overflow-hidden animate-in fade-in duration-500">
       <div className="px-8 py-4 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
@@ -190,6 +330,16 @@ const OKContractCompareView: React.FC = () => {
             </div>
             <p className="text-[11px] text-slate-400 font-bold mt-0.5">文件: {activeFile?.name}</p>
           </div>
+        </div>
+        <div className="flex items-center space-x-3">
+           <button 
+             onClick={startAnalysis}
+             disabled={files.length < 2 || isComparing}
+             className="bg-blue-600 text-white px-6 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center space-x-2 outline-none"
+           >
+             {isComparing ? <Icon name="Loader2" size={14} className="animate-spin" /> : <Icon name="Zap" size={14} />}
+             <span>开始智能对比分析</span>
+           </button>
         </div>
       </div>
 
@@ -223,7 +373,7 @@ const OKContractCompareView: React.FC = () => {
                           <span className="text-xs font-bold text-slate-700">{sheet.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-4">
+                      <td className="px-4 py-4 text-center">
                         <div className="flex items-center justify-center space-x-2">
                           <span className={`text-[10px] font-black transition-colors ${!sheet.isList ? 'text-blue-600' : 'text-slate-300'}`}>否</span>
                           <div 
@@ -252,10 +402,7 @@ const OKContractCompareView: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-center">
-                        <button 
-                          onClick={() => { setActiveSheetId(sheet.id); setViewState('detail'); }}
-                          className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-black hover:bg-blue-100 border border-blue-100 transition-all"
-                        >
+                        <button onClick={() => { setActiveSheetId(sheet.id); setViewState('detail'); }} className="bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-[10px] font-black hover:bg-blue-100 border border-blue-100 transition-all">
                           查看明细
                         </button>
                       </td>
@@ -305,7 +452,169 @@ const OKContractCompareView: React.FC = () => {
     </div>
   );
 
-  // --- 视图: Sheet 明细查看 ---
+  const renderComparisonResultsView = () => (
+    <div className="flex-1 flex h-full bg-[#f4f7fa] overflow-hidden animate-in fade-in duration-500">
+      {/* 左侧 Sheet 选择侧边栏 */}
+      <div className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
+        <div className="p-4 border-b border-slate-50">
+          <h2 className="text-sm font-bold text-slate-800 mb-3">选择Sheet</h2>
+          <div className="relative group">
+            <Icon name="Search" size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500" />
+            <input 
+              type="text" 
+              placeholder="搜索Sheet名称"
+              value={sidebarSearch}
+              onChange={(e) => setSidebarSearch(e.target.value)}
+              className="w-full h-8 bg-[#f8fafc] border border-slate-200 rounded-md pl-8 pr-2 text-xs focus:outline-none focus:border-blue-400 focus:bg-white transition-all"
+            />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-1 py-2 custom-scrollbar">
+          {files.map(file => (
+            <div key={file.id} className="mb-1">
+              <div 
+                onClick={() => toggleSidebarFile(file.id)}
+                className="flex items-center space-x-1.5 px-2 py-1.5 rounded hover:bg-slate-50 cursor-pointer group"
+              >
+                <Icon name={expandedSidebarFiles.has(file.id) ? 'ChevronDown' : 'ChevronRight'} size={12} className="text-slate-400 group-hover:text-blue-500" />
+                <Icon name="FolderOpen" size={14} className="text-blue-400" fill="currentColor" />
+                <span className="text-xs font-medium text-slate-700 truncate flex-1">{file.name}</span>
+                <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded-full">60</span>
+              </div>
+              {expandedSidebarFiles.has(file.id) && (
+                <div className="ml-6 space-y-0.5 mt-0.5">
+                  {Array.from({ length: 15 }).map((_, i) => (
+                    <div 
+                      key={i} 
+                      onClick={() => {
+                        const sid = `${file.id}-s${i}`;
+                        setSelectedSheets(prev => {
+                          const next = new Set(prev);
+                          if (next.has(sid)) next.delete(sid);
+                          else next.add(sid);
+                          return next;
+                        });
+                      }}
+                      className={`flex items-center space-x-2 px-2 py-1.5 rounded cursor-pointer ${selectedSheets.has(`${file.id}-s${i}`) ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                    >
+                      <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center transition-all ${selectedSheets.has(`${file.id}-s${i}`) ? 'bg-blue-500 border-blue-500' : 'border-slate-300 bg-white'}`}>
+                        {selectedSheets.has(`${file.id}-s${i}`) && <Icon name="Check" size={10} className="text-white" strokeWidth={4} />}
+                      </div>
+                      <Icon name="FileSpreadsheet" size={14} className="text-slate-400" />
+                      <span className={`text-[11px] truncate ${selectedSheets.has(`${file.id}-s${i}`) ? 'text-blue-600 font-medium' : 'text-slate-500'}`}>
+                        表10.2.2-16 分部分项工程清单与计价表
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 右侧比对结果主体 */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
+          <h1 className="text-lg font-bold text-slate-800">比对结果</h1>
+          <div className="flex items-center space-x-2">
+             <span className="bg-[#e6f7ff] text-[#1890ff] text-[10px] font-bold px-3 py-1 rounded">共 167 个清单项</span>
+             <span className="bg-[#f6ffed] text-[#52c41a] text-[10px] font-bold px-3 py-1 rounded border border-[#b7eb8f]">已选择 {selectedSheets.size} 个Sheet</span>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 pb-4 custom-scrollbar bg-white">
+          <div className="bg-white border border-slate-200 rounded-md shadow-sm overflow-hidden mt-4 mx-4">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-white border-b border-slate-100 text-[11px] font-bold text-slate-400">
+                  <th className="w-12 px-2 py-4"></th>
+                  <th className="px-4 py-4 text-left font-bold">项目编码</th>
+                  <th className="px-4 py-4 text-left font-bold">项目名称</th>
+                  <th className="px-4 py-4 text-left font-bold">项目特征</th>
+                  <th className="px-4 py-4 text-left font-bold">计量单位</th>
+                  <th className="px-4 py-4 text-left font-bold">价格范围</th>
+                  <th className="px-4 py-4 text-center font-bold">来源数量</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {MOCK_COMPARISON_DATA.map(item => (
+                  <React.Fragment key={item.id}>
+                    <tr 
+                      className={`hover:bg-blue-50/20 transition-all cursor-pointer ${expandedResultRows.has(item.id) ? 'bg-[#f0f7ff]' : ''}`}
+                      onClick={(e) => toggleResultRow(item.id, e)}
+                    >
+                      <td className="px-2 py-5 text-center">
+                        <Icon 
+                          name={expandedResultRows.has(item.id) ? 'ChevronDown' : 'ChevronRight'} 
+                          size={14} 
+                          className="text-slate-300" 
+                        />
+                      </td>
+                      <td className="px-4 py-5 text-[11px] text-slate-500 font-medium">{item.code || ''}</td>
+                      <td className="px-4 py-5 text-[11px] font-bold text-slate-700">{item.name}</td>
+                      <td className="px-4 py-5 text-[11px] text-slate-400 leading-relaxed truncate max-w-[200px]">{item.features || ''}</td>
+                      <td className="px-4 py-5 text-[11px] text-slate-500">{item.unit || ''}</td>
+                      <td className="px-4 py-5">
+                        <div className="space-y-0.5 text-[10px]">
+                           <div className="text-slate-400">最低: ¥{formatPrice(item.minPrice)}</div>
+                           <div className="text-slate-400">最高: ¥{formatPrice(item.maxPrice)}</div>
+                           {item.diffPrice > 0 && <div className="text-orange-500 font-bold">差价: ¥{formatPrice(item.diffPrice)}</div>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-5 text-center">
+                        <span className="inline-flex items-center justify-center w-7 h-7 bg-[#e6f7ff] text-[#1890ff] rounded text-[11px] font-bold border border-[#91d5ff]">
+                          {item.sourceCount}
+                        </span>
+                      </td>
+                    </tr>
+                    {expandedResultRows.has(item.id) && item.details.length > 0 && (
+                      <tr className="bg-white">
+                        <td colSpan={7} className="px-16 py-6 border-b border-slate-100">
+                          <div className="animate-in slide-in-from-top-2 duration-300">
+                            <h3 className="text-[12px] font-bold text-slate-800 mb-4">价格详情</h3>
+                            <div className="border border-slate-100 rounded overflow-hidden shadow-sm">
+                              <table className="w-full text-left">
+                                <thead className="bg-[#f8fafc] border-b border-slate-100">
+                                  <tr className="text-[10px] font-bold text-slate-400">
+                                    <th className="px-5 py-3 w-1/2">来源</th>
+                                    <th className="px-5 py-3">综合单价</th>
+                                    <th className="px-5 py-3">价格差异</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                  {item.details.map((detail, idx) => (
+                                    <tr key={idx} className="text-[11px]">
+                                      <td className="px-5 py-4 text-slate-600">{detail.source}</td>
+                                      <td className="px-5 py-4 font-bold text-[#1890ff]">¥{formatPrice(detail.price)}</td>
+                                      <td className="px-5 py-4">
+                                        {detail.isBaseline ? (
+                                          <span className="bg-slate-100 text-slate-400 px-3 py-1 rounded font-bold text-[10px] border border-slate-200">基准价</span>
+                                        ) : (
+                                          <span className="bg-rose-50 text-rose-500 px-3 py-1 rounded font-bold text-[10px] border border-rose-100">
+                                            +{formatPrice(detail.diff)}
+                                          </span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderDetailView = () => (
     <div className="flex-1 flex flex-col h-full bg-[#f8fafc] overflow-hidden animate-in fade-in duration-500">
       <div className="px-8 py-4 border-b border-slate-200 bg-white flex items-center space-x-6 shrink-0">
@@ -405,30 +714,6 @@ const OKContractCompareView: React.FC = () => {
                     <td className="px-6 py-3.5 text-right font-black text-blue-600 border-r border-slate-50">63,636.66</td>
                     <td className="px-6 py-3.5 text-slate-300">-</td>
                   </tr>
-                  <tr>
-                    <td className="px-6 py-3.5 text-xs font-bold text-slate-300 border-r border-slate-50">3</td>
-                    <td className="px-6 py-3.5 text-slate-600 border-r border-slate-50">2</td>
-                    <td className="px-6 py-3.5 font-mono text-slate-500 border-r border-slate-50">010302001002</td>
-                    <td className="px-6 py-3.5 font-bold text-slate-700 border-r border-slate-50">泥浆护壁成孔灌注桩</td>
-                    <td className="px-6 py-3.5 text-[11px] text-slate-400 leading-relaxed border-r border-slate-50">桩径Φ700 钢护筒埋设及拆除...</td>
-                    <td className="px-6 py-3.5 text-center text-slate-500 border-r border-slate-50">m</td>
-                    <td className="px-6 py-3.5 text-center font-bold text-slate-700 border-r border-slate-50">784</td>
-                    <td className="px-6 py-3.5 text-right font-black text-blue-600 border-r border-slate-50">93,554.72</td>
-                    <td className="px-6 py-3.5 text-slate-300">-</td>
-                  </tr>
-                  {Array.from({ length: 15 }).map((_, idx) => (
-                    <tr key={idx + 4} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-3 text-xs font-bold text-slate-200 border-r border-slate-50">{idx + 4}</td>
-                      <td className="px-6 py-3 border-r border-slate-50">-</td>
-                      <td className="px-6 py-3 border-r border-slate-50">-</td>
-                      <td className="px-6 py-3 text-slate-400 italic border-r border-slate-50">...</td>
-                      <td className="px-6 py-3 border-r border-slate-50">-</td>
-                      <td className="px-6 py-3 border-r border-slate-50">-</td>
-                      <td className="px-6 py-3 border-r border-slate-50">-</td>
-                      <td className="px-6 py-3 text-right border-r border-slate-50">-</td>
-                      <td className="px-6 py-3 text-slate-200">-</td>
-                    </tr>
-                  ))}
                 </tbody>
               </table>
             </div>
@@ -438,80 +723,12 @@ const OKContractCompareView: React.FC = () => {
     </div>
   );
 
-  // --- 视图: 比对主界面 ---
-  const renderComparisonView = () => (
-    <div className="flex-1 flex h-full bg-[#f8fafc] overflow-hidden animate-in fade-in duration-500">
-      <div className="flex-1 flex flex-col items-center justify-center space-y-6">
-        <div className="w-20 h-20 bg-emerald-50 text-emerald-500 rounded-[24px] flex items-center justify-center shadow-lg">
-          <Icon name="CheckCircle" size={40} />
-        </div>
-        <div className="text-center">
-          <h2 className="text-2xl font-black text-slate-800">比对任务已完成</h2>
-          <p className="text-slate-400 mt-2">已成功生成智能比对报告</p>
-        </div>
-        <button onClick={() => setViewState('results')} className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold hover:bg-slate-800 transition-all">返回查看识别结果</button>
-      </div>
-    </div>
-  );
-
   const renderContent = () => {
     switch (viewState) {
-      case 'comparison': return renderComparisonView();
+      case 'comparison-results': return renderComparisonResultsView();
       case 'results': return renderResultsView();
       case 'detail': return renderDetailView();
-      default: return (
-        <div className="flex-1 overflow-y-auto bg-[#f8fafc] p-6 space-y-6 custom-scrollbar">
-          <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-100"><h2 className="text-[14px] font-bold text-slate-800">Excel清单对比识别器</h2></div>
-            <div className="p-4">
-              <div onClick={handleUpload} className="border-2 border-dashed border-slate-100 rounded-xl py-6 flex flex-col items-center justify-center space-y-2 hover:bg-blue-50/30 hover:border-blue-300 transition-all cursor-pointer group">
-                <div className="w-10 h-10 bg-[#40a9ff] rounded-full flex items-center justify-center text-white shadow-lg group-hover:scale-105 transition-transform"><Icon name="CloudUpload" size={20} /></div>
-                <p className="text-[12px] text-slate-500">将Excel文件拖到此处，或<span className="text-blue-500 font-medium">点击上传</span></p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden min-h-[450px]">
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-[14px] font-bold text-slate-800">已上传文件 ({files.length})</h2>
-              <button 
-                onClick={startAnalysis} 
-                disabled={files.length === 0 || isComparing} 
-                className="bg-blue-600 disabled:bg-slate-300 text-white px-5 py-1.5 rounded-lg text-xs font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all flex items-center space-x-2 outline-none"
-              >
-                {isComparing ? <Icon name="Loader2" size={14} className="animate-spin" /> : <Icon name="Zap" size={14} />}
-                <span>开始智能对比分析</span>
-              </button>
-            </div>
-            <div className="p-4 space-y-1.5">
-              {files.map(file => (
-                <div key={file.id} className="relative pl-8">
-                  <div className="absolute left-[3px] top-1.5 bottom-[-10px] w-px bg-slate-100 last:hidden" />
-                  <div className="absolute left-0 top-1.5 w-2 h-2 bg-slate-200 rounded-full border-2 border-white" />
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-slate-400 font-medium">{file.time}</p>
-                    <div className="bg-white border border-slate-100 rounded-xl p-2.5 flex items-center justify-between group hover:shadow-sm hover:border-blue-100 transition-all">
-                      <div className="flex-1 flex items-center justify-between mr-4 min-w-0">
-                        <div className="flex items-center space-x-2 truncate">
-                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${file.type === 'original' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'}`}><Icon name={file.type === 'original' ? 'FileText' : 'FileCheck'} size={14} /></div>
-                          <h3 className="text-xs font-bold text-slate-700 truncate">{file.name}</h3>
-                        </div>
-                        <div className="flex items-center space-x-2 shrink-0 ml-4">
-                          <span className="bg-[#e6f7ff] text-[#1890ff] text-[10px] font-bold px-2 py-0.5 rounded">{file.sheetCount} Sheet</span>
-                          <span className="bg-[#f6ffed] text-[#52c41a] text-[10px] font-bold px-2 py-0.5 rounded">{file.listCount} 清单</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2 shrink-0">
-                        <button onClick={() => { setActiveFile(file); setViewState('results'); }} className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition-all">查看</button>
-                        <button onClick={(e) => { e.stopPropagation(); setFiles(prev => prev.filter(f => f.id !== file.id)); }} className="px-3 py-1 bg-rose-500 text-white rounded-lg text-[10px] font-bold hover:bg-rose-600 transition-all shadow-sm">移除</button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
+      default: return renderUploadView();
     }
   };
 

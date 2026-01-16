@@ -143,7 +143,7 @@ const AmountConverterView: React.FC = () => {
             </button>
           </div>
 
-          <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {/* 阿拉伯数字金额 字段 */}
             <div className="space-y-3">
               <div className="flex items-center justify-between px-1">
@@ -157,12 +157,11 @@ const AmountConverterView: React.FC = () => {
                 </button>
               </div>
               <div className="relative group">
-                <input 
-                  type="text" 
+                <textarea 
                   value={numInput}
                   onChange={(e) => handleNumChange(e.target.value)}
                   placeholder="例如：12345.67 或 9876"
-                  className="w-full h-14 bg-slate-50 border border-slate-100 rounded-xl px-5 text-base font-medium text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-orange-500/5 focus:border-orange-400 focus:bg-white transition-all"
+                  className="w-full h-32 bg-slate-50 border border-slate-100 rounded-xl px-5 py-4 text-base font-medium text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-4 focus:ring-orange-500/5 focus:border-orange-400 focus:bg-white transition-all resize-none leading-relaxed"
                 />
               </div>
             </div>
@@ -265,7 +264,7 @@ const AmountConverterView: React.FC = () => {
         </div>
       </div>
 
-      {/* 热门工具推荐区域：完全参考日期计算器布局，并修复标题栏宽度自适应 */}
+      {/* 热门工具推荐区域 */}
       <div className="w-full">
         <section className="pt-10 pb-16 border-t border-slate-200/60">
           <div className="flex items-center justify-between mb-8 max-w-[1600px] mx-auto px-4 md:px-6">
