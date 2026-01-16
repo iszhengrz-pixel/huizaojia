@@ -8,12 +8,14 @@ import DateCalculatorView from './components/DateCalculatorView';
 import TaxCalculatorView from './components/TaxCalculatorView';
 import AIVisionView from './components/AIVisionView';
 import OKContractCompareView from './components/OKContractCompareView';
+import OneVsOneCompareView from './components/OneVsOneCompareView';
 import ToolManagementView from './components/ToolManagementView';
 import AllToolsView from './components/AllToolsView';
 import ProfileView from './components/ProfileView';
 import UserManagementView from './components/UserManagementView';
 import RoleManagementView from './components/RoleManagementView';
 import MenuManagementView from './components/MenuManagementView';
+import AmountConverterView from './components/AmountConverterView';
 import { ALL_TOOLS, DEFAULT_HOT_TOOLS, DEFAULT_MY_TOOLS } from './constants';
 import { ToolItem } from './types';
 
@@ -138,8 +140,10 @@ const App: React.FC = () => {
           onSelectTool={(tool) => {
             if(tool.id === 'ai-vision') handleSelect('quantity', 'ai-vision');
             else if(tool.id === 'ok-contract') handleSelect('pricing', 'ok-contract');
+            else if(tool.id === 'one-vs-one-compare') handleSelect('pricing', 'one-vs-one-compare');
             else if(tool.id === 'ok-date-calc') handleSelect('general', 'ok-date-calc');
             else if(tool.id === 'ok-tax-calc') handleSelect('general', 'ok-tax-calc');
+            else if(tool.id === 'amount-converter') handleSelect('general', 'amount-converter');
             else if(tool.category === 'AI问答') handleSelect('ai-qa', tool.id);
             else alert(`启动工具: ${tool.name}`);
           }}
@@ -166,6 +170,15 @@ const App: React.FC = () => {
       );
     }
 
+    if (activeSubId === 'amount-converter') {
+      return (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {renderToolHeader('人民币大小写转换', 'amount-converter')}
+          <AmountConverterView />
+        </div>
+      );
+    }
+
     if (activeSubId === 'ai-vision') {
       return (
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -180,6 +193,15 @@ const App: React.FC = () => {
         <div className="flex-1 flex flex-col overflow-hidden">
           {renderToolHeader('合同价对比', 'ok-contract')}
           <OKContractCompareView />
+        </div>
+      );
+    }
+
+    if (activeSubId === 'one-vs-one-compare') {
+      return (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {renderToolHeader('1V1对比（暂存）', 'one-vs-one-compare')}
+          <OneVsOneCompareView />
         </div>
       );
     }
@@ -342,8 +364,10 @@ const App: React.FC = () => {
                     isFavorite={selectedToolIds.includes(tool.id)}
                     onClick={() => {
                       if(tool.id === 'ok-contract') handleSelect('pricing', 'ok-contract');
+                      else if(tool.id === 'one-vs-one-compare') handleSelect('pricing', 'one-vs-one-compare');
                       else if(tool.id === 'ok-date-calc') handleSelect('general', 'ok-date-calc');
                       else if(tool.id === 'ok-tax-calc') handleSelect('general', 'ok-tax-calc');
+                      else if(tool.id === 'amount-converter') handleSelect('general', 'amount-converter');
                       else if(tool.id === 'ai-vision') handleSelect('quantity', 'ai-vision');
                       else alert(`启动工具: ${tool.name}`);
                     }} 
@@ -384,6 +408,7 @@ const App: React.FC = () => {
                     isFavorite={selectedToolIds.includes(tool.id)}
                     onClick={() => {
                       if(tool.id === 'ai-vision') handleSelect('quantity', 'ai-vision');
+                      else if(tool.id === 'amount-converter') handleSelect('general', 'amount-converter');
                       else alert(`启动工具: ${tool.name}`);
                     }} 
                   />

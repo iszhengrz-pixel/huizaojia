@@ -1,7 +1,8 @@
+
 import { MenuItem, ToolItem } from './types';
 
 export const NAVIGATION_MENU: MenuItem[] = [
-  { id: 'home', label: '汇造价', icon: 'LayoutGrid' },
+  { id: 'home', label: '首页', icon: 'LayoutGrid' },
   { 
     id: 'quantity', 
     label: '汇计量', 
@@ -24,6 +25,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
       { id: 'fee-standards', label: '前后期收费标准库', parentId: 'pricing' },
       { id: 'ai-plant-list', label: 'AI苗木表编清单', parentId: 'pricing' },
       { id: 'ok-contract', label: '合同价对比', parentId: 'pricing' },
+      { id: 'one-vs-one-compare', label: '1V1对比（暂存）', parentId: 'pricing' },
       { id: 'price-file-compare', label: '计价文件对比', parentId: 'pricing' },
     ]
   },
@@ -37,7 +39,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
       { id: 'fee-calc', label: '收费计算器', parentId: 'general' },
       { id: 'excel-tools', label: '表格处理功能', parentId: 'general' },
       { id: 'ok-dwg-compare', label: 'AI图纸对比', parentId: 'general' },
-      { id: 'amount-converter', label: '金额大小写转换', parentId: 'general' },
+      { id: 'amount-converter', label: '人民币大小写转换', parentId: 'general' },
       { id: 'ok-tax-calc', label: '税费计算', parentId: 'general' },
       { id: 'simple-calc', label: '计算器', parentId: 'general' },
       { id: 'general-data', label: '通用数据', parentId: 'general' },
@@ -102,10 +104,25 @@ export const ALL_TOOLS_CATEGORIZED: ToolCategory[] = [
             "点击'开始智能对比'，系统将自动基于项目编码与名称进行行级对齐",
             "在表头使用'齿轮'图标筛选需要重点关注的费用项（如人工费、材料费）",
             "按住鼠标左键'拖拽拉框'，可实时汇总选区内的数值总额",
-            "右键点击任意单元格，可设置颜色标记，便于后续核查复核",
-            "点击最左侧'垃圾桶'图标可删除不再参与对比的清单行"
+            "右键点击任意单元格，可设置颜色标记，便于后续核查复核"
           ],
           tips: ["差异项会自动标红显示", "双击数值单元格可进入快速编辑模式，实时重新计算合价差额"]
+        }
+      },
+      { 
+        id: 'one-vs-one-compare', 
+        name: '1V1对比（暂存）', 
+        icon: 'Copy', 
+        category: '汇计价', 
+        description: '单对单文件级精细化对比与暂存管理',
+        tutorial: {
+          overview: "该工具专为单对单文件对比设计，支持对比状态的暂存与随时恢复。",
+          steps: [
+            "选择两个需要对比的文件版本",
+            "执行1V1深度匹配，系统会高亮显性差异项",
+            "支持对对比过程进行'暂存'，方便下次继续审核",
+            "结果支持一键导出比对报告"
+          ]
         }
       },
       { id: 'price-file-compare', name: '计价文件对比', icon: 'Files', category: '汇计价' },
@@ -119,7 +136,21 @@ export const ALL_TOOLS_CATEGORIZED: ToolCategory[] = [
       { id: 'fee-calc', name: '收费计算器', icon: 'Wallet', category: '汇通用' },
       { id: 'excel-tools', name: '表格处理功能', icon: 'Table2', category: '汇通用' },
       { id: 'ok-dwg-compare', name: 'AI图纸对比', icon: 'Dna', category: '汇通用' },
-      { id: 'amount-converter', name: '金额大小写转换', icon: 'Coins', category: '汇通用' },
+      { 
+        id: 'amount-converter', 
+        name: '人民币大小写转换', 
+        icon: 'Coins', 
+        category: '汇通用',
+        tutorial: {
+          overview: "人民币大小写转换是将阿拉伯数字表示的金额转换为中文大写金额，或反向转换的过程。这一转换在财务、会计领域至关重要，能有效防止金额被篡改。",
+          steps: [
+            "中文大写金额数字应用“壹、贰、叁、肆、伍、陆、柒、捌、玖、拾、佰、仟、万、亿、元、角、分、零、整”等字样。",
+            "大写金额到“元”为止的，在“元”之后应写“整”字；在“角”之后，可以不写“整”字。",
+            "大写金额数字有“分”的，“分”后面不写“整”字。",
+            "工具支持双向转换：在‘阿拉伯数字金额’框输入数字，或在‘中文大写金额’框输入大写文字，结果将实时同步。"
+          ]
+        }
+      },
       { id: 'ok-tax-calc', name: '税费计算', icon: 'Calculator', category: '汇通用' },
       { id: 'simple-calc', name: '计算器', icon: 'PlusMinus', category: '汇通用' },
       { id: 'general-data', name: '通用数据', icon: 'Info', category: '汇通用' },
@@ -131,4 +162,4 @@ export const ALL_TOOLS_CATEGORIZED: ToolCategory[] = [
 export const ALL_TOOLS: ToolItem[] = ALL_TOOLS_CATEGORIZED.flatMap(cat => cat.tools);
 
 export const DEFAULT_HOT_TOOLS: string[] = ['ai-vision', 'ai-cad', 'ok-contract', 'formula'];
-export const DEFAULT_MY_TOOLS: string[] = ['ai-vision', 'calc-tool', 'formula', 'ok-contract', 'material-diff'];
+export const DEFAULT_MY_TOOLS: string[] = ['ai-vision', 'calc-tool', 'formula', 'ok-contract', 'material-diff', 'one-vs-one-compare'];

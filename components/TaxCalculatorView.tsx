@@ -1,11 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import Icon from './Icon';
+import ToolCard from './ToolCard';
+import { ALL_TOOLS } from '../constants';
 
 const COMMON_TAX_RATES = [1, 3, 6, 9, 13];
 
 const TaxCalculatorView: React.FC = () => {
   const [precision, setPrecision] = useState(2);
+
+  // 热门工具筛选
+  const hotTools = ALL_TOOLS.filter(t => t.isHot).slice(0, 6);
 
   // Mode 1: Including Tax -> Others
   const [incInput, setIncInput] = useState<string>('111.00');
@@ -47,12 +51,12 @@ const TaxCalculatorView: React.FC = () => {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    // Simple feedback could be added here
+    alert('已复制到剪贴板');
   };
 
   return (
-    <div className="flex-1 overflow-y-auto bg-slate-50 p-6 lg:p-10">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="flex-1 overflow-y-auto bg-slate-50 p-6 lg:p-10 scroll-smooth custom-scrollbar animate-in fade-in duration-500">
+      <div className="max-w-4xl mx-auto space-y-8 mb-16">
         {/* Header */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center space-x-3">
@@ -79,7 +83,7 @@ const TaxCalculatorView: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 1: 含税金额 input */}
+        {/* Section 1: 含税计算 */}
         <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-40 h-40 bg-blue-50/30 rounded-full -mr-20 -mt-20 group-hover:scale-110 transition-transform duration-700 pointer-events-none"></div>
           
@@ -164,7 +168,7 @@ const TaxCalculatorView: React.FC = () => {
           </div>
         </div>
 
-        {/* Section 2: 不含税金额 input */}
+        {/* Section 2: 不含税计算 */}
         <div className="bg-white rounded-[32px] p-8 shadow-sm border border-slate-100 relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-50/30 rounded-full -mr-20 -mt-20 group-hover:scale-110 transition-transform duration-700 pointer-events-none"></div>
           
@@ -248,24 +252,32 @@ const TaxCalculatorView: React.FC = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Info Box */}
-        <div className="bg-indigo-900 rounded-[32px] p-6 text-white flex items-center space-x-6 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Icon name="Info" size={120} />
-          </div>
-          <div className="w-16 h-16 bg-white/10 rounded-3xl flex items-center justify-center shrink-0">
-             <Icon name="Lightbulb" size={32} className="text-amber-400" />
-          </div>
-          <div>
-            <h4 className="text-lg font-bold mb-1">计算公式说明</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-indigo-100 text-sm opacity-80 font-medium">
-              <p>• 不含税金额 = 含税金额 / (1 + 税率)</p>
-              <p>• 含税金额 = 不含税金额 * (1 + 税率)</p>
-              <p>• 税金 = 含税金额 - 不含税金额</p>
+      {/* 热门工具推荐区域：完全参考日期计算器布局，修复标题栏宽度自适应 */}
+      <div className="w-full">
+        <section className="pt-10 pb-16 border-t border-slate-200/60">
+          <div className="flex items-center justify-between mb-8 max-w-[1600px] mx-auto px-4 md:px-6">
+            <div className="flex items-center space-x-3">
+              <div className="w-1.5 h-6 bg-blue-600 rounded-full"></div>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight">热门推荐</h2>
             </div>
+            <button className="text-xs text-blue-600 font-bold hover:text-blue-800 flex items-center transition-colors outline-none">
+               查看全部 <Icon name="ChevronRight" size={14} className="ml-1" />
+            </button>
           </div>
-        </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4 px-4 max-w-[1600px] mx-auto md:px-6">
+            {hotTools.map(tool => (
+              <ToolCard 
+                key={tool.id} 
+                tool={tool} 
+                onClick={() => {
+                  alert(`即将为您启动: ${tool.name}`);
+                }} 
+              />
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
