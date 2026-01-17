@@ -126,7 +126,7 @@ const AmountConverterView: React.FC = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">人民币大小写转换工具</h1>
-            <p className="text-slate-500 text-sm font-medium">专业、精准的金额转换服务，支持数字转大写、大写转数字，满足财务、会计工作需求</p>
+            <p className="text-slate-500 text-sm font-medium">提供专业的人民币金额大小写双向转换，支持实时同步。</p>
           </div>
         </div>
 

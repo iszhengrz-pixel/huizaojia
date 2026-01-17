@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Icon from './Icon';
 
@@ -157,7 +156,7 @@ const INITIAL_IDENTIFICATION_DATA: SheetIdentification[] = [
     headerFields: ['序号', '项目编码', '项目名称', '项目特征', '计量单位', '工程量', '金额（元）', '备注'],
     previewData: [
       { c1: '', c2: '', c3: '0103 桩基工程', c4: '', c5: '', c6: '', c7: '' },
-      { c1: '1', c2: '010302001001', c3: '泥浆护壁成孔灌注桩', c4: '桩径Φ600 钢护筒埋设...', c5: 'm', c6: '698', c7: '90' }
+      { c1: '1', c2: '010302001001', c3: '泥浆护壁成孔灌注桩', c4: '桩径Φ600 钢护筒埋设及拆除...', c5: 'm', c6: '698', c7: '90' }
     ]
   },
   {
@@ -169,7 +168,7 @@ const INITIAL_IDENTIFICATION_DATA: SheetIdentification[] = [
     confidence: 100,
     headerFields: ['序号', '项目编码', '项目名称', '项目特征', '计量单位', '工程量', '金额（元）', '备注'],
     previewData: [
-      { c1: '1', c2: '010302001001', c3: '泥浆护壁成孔灌注桩', c4: '桩径Φ600 钢护筒埋设...', c5: 'm', c6: '698', c7: '90' }
+      { c1: '1', c2: '010302001001', c3: '泥浆护壁成孔灌注桩', c4: '桩径Φ600 钢护筒埋设及拆除...', c5: 'm', c6: '698', c7: '90' }
     ]
   }
 ];
@@ -189,6 +188,25 @@ const OKContractCompareView: React.FC = () => {
   const [expandedSidebarFiles, setExpandedSidebarFiles] = useState<Set<string>>(new Set(['f1', 'f2']));
   const [selectedSheets, setSelectedSheets] = useState<Set<string>>(new Set(['f1-s1', 'f2-s1']));
   const [sidebarSearch, setSidebarSearch] = useState('');
+
+  // 比对标签页状态：价格 vs 工程量
+  const [compareTab, setCompareTab] = useState<'price' | 'quantity'>('price');
+
+  // 列映射及状态
+  const [isMappingModalOpen, setIsMappingModalOpen] = useState(false);
+  const [isManualMappingApplied, setIsManualMappingApplied] = useState(false); // 标记是否执行过手动映射
+  const [columnMapping, setColumnMapping] = useState({
+    code: '',
+    name: 'C',
+    features: 'D',
+    unit: 'E',
+    price: 'G'
+  });
+
+  // Sheet 变更确认弹窗状态
+  const [isSheetConfirmModalOpen, setIsSheetConfirmModalOpen] = useState(false);
+  const [dontShowMappingWarning, setDontShowMappingWarning] = useState(false);
+  const [pendingSheetToggle, setPendingSheetToggle] = useState<string | null>(null);
 
   const handleUpload = () => {
     const isFirst = files.length === 0;
@@ -228,6 +246,56 @@ const OKContractCompareView: React.FC = () => {
     setExpandedSidebarFiles(newExpanded);
   };
 
+  // 统一处理 Sheet 选择逻辑，加入确认拦截
+  const handleSheetToggle = (sheetId: string) => {
+    if (isManualMappingApplied && !dontShowMappingWarning) {
+      setPendingSheetToggle(sheetId);
+      setIsSheetConfirmModalOpen(true);
+      return;
+    }
+    applySheetToggle(sheetId);
+  };
+
+  const applySheetToggle = (sheetId: string) => {
+    setSelectedSheets(prev => {
+      const next = new Set(prev);
+      if (next.has(sheetId)) next.delete(sheetId);
+      else next.add(sheetId);
+      return next;
+    });
+    setPendingSheetToggle(null);
+  };
+
+  const toggleFolderSelection = (fileId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const folderSheetIds = Array.from({ length: 15 }).map((_, i) => `${fileId}-s${i}`);
+    const isAllSelected = folderSheetIds.every(id => selectedSheets.has(id));
+    
+    // 如果是批量选择，且手动映射已开启，也触发拦截（简化处理，只要有一个触发即可）
+    if (isManualMappingApplied && !dontShowMappingWarning) {
+        // 这里为了体验简单化，批量操作也使用同一个弹窗逻辑，但 pending 处理不同
+        // 实际上 pending 可以是一个 Action
+        setPendingSheetToggle(`BATCH:${fileId}:${isAllSelected}`); 
+        setIsSheetConfirmModalOpen(true);
+        return;
+    }
+    applyFolderSelection(fileId, isAllSelected);
+  };
+
+  const applyFolderSelection = (fileId: string, isAllSelected: boolean) => {
+    const folderSheetIds = Array.from({ length: 15 }).map((_, i) => `${fileId}-s${i}`);
+    setSelectedSheets(prev => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        folderSheetIds.forEach(id => next.delete(id));
+      } else {
+        folderSheetIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+    setPendingSheetToggle(null);
+  };
+
   const toggleResultRow = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const newExpanded = new Set(expandedResultRows);
@@ -238,6 +306,10 @@ const OKContractCompareView: React.FC = () => {
 
   const formatPrice = (price: number) => {
     return price.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const formatVal = (val: number) => {
+    return compareTab === 'price' ? `¥${formatPrice(val)}` : formatPrice(val);
   };
 
   const toggleIsList = (id: string) => {
@@ -331,16 +403,6 @@ const OKContractCompareView: React.FC = () => {
             <p className="text-[11px] text-slate-400 font-bold mt-0.5">文件: {activeFile?.name}</p>
           </div>
         </div>
-        <div className="flex items-center space-x-3">
-           <button 
-             onClick={startAnalysis}
-             disabled={files.length < 2 || isComparing}
-             className="bg-blue-600 text-white px-6 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 flex items-center space-x-2 outline-none"
-           >
-             {isComparing ? <Icon name="Loader2" size={14} className="animate-spin" /> : <Icon name="Zap" size={14} />}
-             <span>开始智能对比分析</span>
-           </button>
-        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
@@ -351,7 +413,7 @@ const OKContractCompareView: React.FC = () => {
                 <tr className="bg-slate-50/50 border-b border-slate-100">
                   <th className="w-12 px-4 py-4"></th>
                   <th className="px-4 py-4 text-xs font-black text-slate-400 text-left uppercase tracking-wider">Sheet名称</th>
-                  <th className="px-4 py-4 text-xs font-black text-slate-400 text-center uppercase tracking-wider">是否清单</th>
+                  <th className="px-4 py-4 text-xs font-black text-slate-400 text-center uppercase tracking-wider">是否加入对比</th>
                   <th className="px-4 py-4 text-xs font-black text-slate-400 text-center uppercase tracking-wider">数据行数</th>
                   <th className="px-4 py-4 text-xs font-black text-slate-400 text-left uppercase tracking-wider">匹配字段</th>
                   <th className="px-4 py-4 text-xs font-black text-slate-400 text-left uppercase tracking-wider">置信度</th>
@@ -457,7 +519,12 @@ const OKContractCompareView: React.FC = () => {
       {/* 左侧 Sheet 选择侧边栏 */}
       <div className="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
         <div className="p-4 border-b border-slate-50">
-          <h2 className="text-sm font-bold text-slate-800 mb-3">选择Sheet</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-slate-800">选择Sheet</h2>
+            <div className="bg-[#f6ffed] text-[#52c41a] text-[10px] font-bold px-2 py-0.5 rounded border border-[#b7eb8f]">
+               已选择 {selectedSheets.size} 个Sheet
+            </div>
+          </div>
           <div className="relative group">
             <Icon name="Search" size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500" />
             <input 
@@ -470,56 +537,89 @@ const OKContractCompareView: React.FC = () => {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-1 py-2 custom-scrollbar">
-          {files.map(file => (
-            <div key={file.id} className="mb-1">
-              <div 
-                onClick={() => toggleSidebarFile(file.id)}
-                className="flex items-center space-x-1.5 px-2 py-1.5 rounded hover:bg-slate-50 cursor-pointer group"
-              >
-                <Icon name={expandedSidebarFiles.has(file.id) ? 'ChevronDown' : 'ChevronRight'} size={12} className="text-slate-400 group-hover:text-blue-500" />
-                <Icon name="FolderOpen" size={14} className="text-blue-400" fill="currentColor" />
-                <span className="text-xs font-medium text-slate-700 truncate flex-1">{file.name}</span>
-                <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded-full">60</span>
-              </div>
-              {expandedSidebarFiles.has(file.id) && (
-                <div className="ml-6 space-y-0.5 mt-0.5">
-                  {Array.from({ length: 15 }).map((_, i) => (
-                    <div 
-                      key={i} 
-                      onClick={() => {
-                        const sid = `${file.id}-s${i}`;
-                        setSelectedSheets(prev => {
-                          const next = new Set(prev);
-                          if (next.has(sid)) next.delete(sid);
-                          else next.add(sid);
-                          return next;
-                        });
-                      }}
-                      className={`flex items-center space-x-2 px-2 py-1.5 rounded cursor-pointer ${selectedSheets.has(`${file.id}-s${i}`) ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
-                    >
-                      <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center transition-all ${selectedSheets.has(`${file.id}-s${i}`) ? 'bg-blue-500 border-blue-500' : 'border-slate-300 bg-white'}`}>
-                        {selectedSheets.has(`${file.id}-s${i}`) && <Icon name="Check" size={10} className="text-white" strokeWidth={4} />}
-                      </div>
-                      <Icon name="FileSpreadsheet" size={14} className="text-slate-400" />
-                      <span className={`text-[11px] truncate ${selectedSheets.has(`${file.id}-s${i}`) ? 'text-blue-600 font-medium' : 'text-slate-500'}`}>
-                        表10.2.2-16 分部分项工程清单与计价表
-                      </span>
-                    </div>
-                  ))}
+          {files.map(file => {
+            const folderSheetIds = Array.from({ length: 15 }).map((_, i) => `${file.id}-s${i}`);
+            const isFolderAllSelected = folderSheetIds.every(id => selectedSheets.has(id));
+            
+            return (
+              <div key={file.id} className="mb-1">
+                <div 
+                  onClick={() => toggleSidebarFile(file.id)}
+                  className="flex items-center space-x-1.5 px-2 py-1.5 rounded hover:bg-slate-50 cursor-pointer group"
+                >
+                  <Icon name={expandedSidebarFiles.has(file.id) ? 'ChevronDown' : 'ChevronRight'} size={12} className="text-slate-400 group-hover:text-blue-500" />
+                  <div 
+                    onClick={(e) => toggleFolderSelection(file.id, e)}
+                    className={`w-3.5 h-3.5 border rounded flex items-center justify-center transition-all ${isFolderAllSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300 bg-white hover:border-blue-400'}`}
+                  >
+                    {isFolderAllSelected && <Icon name="Check" size={10} className="text-white" strokeWidth={4} />}
+                  </div>
+                  <Icon name="FolderOpen" size={14} className="text-blue-400" fill="currentColor" />
+                  <span className="text-xs font-medium text-slate-700 truncate flex-1">{file.name}</span>
+                  <span className="text-[10px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded-full">60</span>
                 </div>
-              )}
-            </div>
-          ))}
+                {expandedSidebarFiles.has(file.id) && (
+                  <div className="ml-6 space-y-0.5 mt-0.5">
+                    {Array.from({ length: 15 }).map((_, i) => (
+                      <div 
+                        key={i} 
+                        onClick={() => handleSheetToggle(`${file.id}-s${i}`)}
+                        className={`flex items-center space-x-2 px-2 py-1.5 rounded cursor-pointer ${selectedSheets.has(`${file.id}-s${i}`) ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                      >
+                        <div className={`w-3.5 h-3.5 border rounded flex items-center justify-center transition-all ${selectedSheets.has(`${file.id}-s${i}`) ? 'bg-blue-500 border-blue-500' : 'border-slate-300 bg-white'}`}>
+                          {selectedSheets.has(`${file.id}-s${i}`) && <Icon name="Check" size={10} className="text-white" strokeWidth={4} />}
+                        </div>
+                        <Icon name="FileSpreadsheet" size={14} className="text-slate-400" />
+                        <span className={`text-[11px] truncate ${selectedSheets.has(`${file.id}-s${i}`) ? 'text-blue-600 font-medium' : 'text-slate-500'}`}>
+                          表10.2.2-16 分部分项工程清单与计价表
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* 右侧比对结果主体 */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <div className="p-4 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
-          <h1 className="text-lg font-bold text-slate-800">比对结果</h1>
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={() => setViewState('results')}
+              className="p-2 text-slate-400 hover:text-blue-600 bg-white rounded-lg border border-slate-200 shadow-sm transition-all outline-none"
+            >
+              <Icon name="ArrowLeft" size={18} />
+            </button>
+            <div className="flex items-center space-x-4">
+              <h1 className="text-lg font-bold text-slate-800">比对结果</h1>
+              <div className="bg-slate-100/80 p-1 rounded-lg flex items-center shadow-inner">
+                <button 
+                  onClick={() => setCompareTab('price')}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${compareTab === 'price' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  对比价格
+                </button>
+                <button 
+                  onClick={() => setCompareTab('quantity')}
+                  className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${compareTab === 'quantity' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  对比工程量
+                </button>
+              </div>
+            </div>
+          </div>
           <div className="flex items-center space-x-2">
              <span className="bg-[#e6f7ff] text-[#1890ff] text-[10px] font-bold px-3 py-1 rounded">共 167 个清单项</span>
-             <span className="bg-[#f6ffed] text-[#52c41a] text-[10px] font-bold px-3 py-1 rounded border border-[#b7eb8f]">已选择 {selectedSheets.size} 个Sheet</span>
+             <button 
+               onClick={() => setIsMappingModalOpen(true)}
+               className="flex items-center space-x-1.5 px-3 py-1 bg-white border border-slate-200 text-slate-600 rounded hover:bg-slate-50 transition-all text-[10px] font-bold shadow-sm outline-none"
+             >
+               <Icon name="Settings" size={12} />
+               <span>手动列映射设置</span>
+             </button>
           </div>
         </div>
 
@@ -533,7 +633,7 @@ const OKContractCompareView: React.FC = () => {
                   <th className="px-4 py-4 text-left font-bold">项目名称</th>
                   <th className="px-4 py-4 text-left font-bold">项目特征</th>
                   <th className="px-4 py-4 text-left font-bold">计量单位</th>
-                  <th className="px-4 py-4 text-left font-bold">价格范围</th>
+                  <th className="px-4 py-4 text-left font-bold">{compareTab === 'price' ? '价格范围' : '工程量范围'}</th>
                   <th className="px-4 py-4 text-center font-bold">来源数量</th>
                 </tr>
               </thead>
@@ -557,9 +657,9 @@ const OKContractCompareView: React.FC = () => {
                       <td className="px-4 py-5 text-[11px] text-slate-500">{item.unit || ''}</td>
                       <td className="px-4 py-5">
                         <div className="space-y-0.5 text-[10px]">
-                           <div className="text-slate-400">最低: ¥{formatPrice(item.minPrice)}</div>
-                           <div className="text-slate-400">最高: ¥{formatPrice(item.maxPrice)}</div>
-                           {item.diffPrice > 0 && <div className="text-orange-500 font-bold">差价: ¥{formatPrice(item.diffPrice)}</div>}
+                           <div className="text-slate-400">最低: {formatVal(item.minPrice)}</div>
+                           <div className="text-slate-400">最高: {formatVal(item.maxPrice)}</div>
+                           {item.diffPrice > 0 && <div className="text-orange-500 font-bold">差异: {formatVal(item.diffPrice)}</div>}
                         </div>
                       </td>
                       <td className="px-4 py-5 text-center">
@@ -572,27 +672,29 @@ const OKContractCompareView: React.FC = () => {
                       <tr className="bg-white">
                         <td colSpan={7} className="px-16 py-6 border-b border-slate-100">
                           <div className="animate-in slide-in-from-top-2 duration-300">
-                            <h3 className="text-[12px] font-bold text-slate-800 mb-4">价格详情</h3>
+                            <h3 className="text-[12px] font-bold text-slate-800 mb-4">{compareTab === 'price' ? '价格详情' : '工程量详情'}</h3>
                             <div className="border border-slate-100 rounded overflow-hidden shadow-sm">
                               <table className="w-full text-left">
                                 <thead className="bg-[#f8fafc] border-b border-slate-100">
                                   <tr className="text-[10px] font-bold text-slate-400">
                                     <th className="px-5 py-3 w-1/2">来源</th>
-                                    <th className="px-5 py-3">综合单价</th>
-                                    <th className="px-5 py-3">价格差异</th>
+                                    <th className="px-5 py-3">{compareTab === 'price' ? '综合单价' : '工程量'}</th>
+                                    <th className="px-5 py-3">{compareTab === 'price' ? '价格差异' : '工程量差异'}</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                  {item.details.map((detail, idx) => (
+                                  {[...item.details]
+                                    .sort((a, b) => (a.isBaseline === b.isBaseline ? 0 : a.isBaseline ? -1 : 1))
+                                    .map((detail, idx) => (
                                     <tr key={idx} className="text-[11px]">
                                       <td className="px-5 py-4 text-slate-600">{detail.source}</td>
-                                      <td className="px-5 py-4 font-bold text-[#1890ff]">¥{formatPrice(detail.price)}</td>
+                                      <td className="px-5 py-4 font-bold text-[#1890ff]">{formatVal(detail.price)}</td>
                                       <td className="px-5 py-4">
                                         {detail.isBaseline ? (
-                                          <span className="bg-slate-100 text-slate-400 px-3 py-1 rounded font-bold text-[10px] border border-slate-200">基准价</span>
+                                          <span className="bg-slate-100 text-slate-400 px-3 py-1 rounded font-bold text-[10px] border border-slate-200">最低值</span>
                                         ) : (
                                           <span className="bg-rose-50 text-rose-500 px-3 py-1 rounded font-bold text-[10px] border border-rose-100">
-                                            +{formatPrice(detail.diff)}
+                                            +{formatVal(detail.diff)}
                                           </span>
                                         )}
                                       </td>
@@ -633,7 +735,7 @@ const OKContractCompareView: React.FC = () => {
               <div className="flex items-center space-x-6">
                 <h2 className="text-xl font-black text-slate-800">{activeSheet?.name}</h2>
                 <div className="flex items-center bg-slate-50 rounded-2xl px-4 py-2 border border-slate-100 space-x-4">
-                  <span className="text-xs font-black text-slate-500">是否清单</span>
+                  <span className="text-xs font-black text-slate-500">是否加入对比</span>
                   <div className="flex items-center space-x-2">
                     <span className={`text-[11px] font-black transition-colors ${!activeSheet?.isList ? 'text-blue-600' : 'text-slate-300'}`}>否</span>
                     <div 
@@ -679,20 +781,27 @@ const OKContractCompareView: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-left">
                 <thead className="bg-[#f8fafc] border-b border-slate-200 sticky top-0 z-10 font-bold">
-                  <tr className="text-[11px] text-slate-500 uppercase tracking-wider">
-                    <th className="px-6 py-4 border-r border-slate-100 bg-slate-50/50">行号</th>
-                    <th className="px-6 py-4 border-r border-slate-100">序号</th>
-                    <th className="px-6 py-4 border-r border-slate-100">项目编码</th>
-                    <th className="px-6 py-4 border-r border-slate-100 min-w-[200px]">项目名称</th>
-                    <th className="px-6 py-4 border-r border-slate-100 min-w-[150px]">项目特征</th>
-                    <th className="px-6 py-4 border-r border-slate-100 text-center">计量单位</th>
-                    <th className="px-6 py-4 border-r border-slate-100 text-center">工程量</th>
-                    <th className="px-6 py-4 border-r border-slate-100 text-right">金额（元）</th>
-                    <th className="px-6 py-4">备注</th>
+                  <tr className="text-[11px] text-slate-500 uppercase tracking-wider text-center">
+                    <th rowSpan={2} className="px-3 py-4 border-r border-slate-100 bg-slate-50/50">行号</th>
+                    <th rowSpan={2} className="px-3 py-4 border-r border-slate-100">序号</th>
+                    <th rowSpan={2} className="px-3 py-4 border-r border-slate-100">项目编码</th>
+                    <th rowSpan={2} className="px-3 py-4 border-r border-slate-100 min-w-[180px]">项目名称</th>
+                    <th rowSpan={2} className="px-3 py-4 border-r border-slate-100 min-w-[150px]">项目特征</th>
+                    <th rowSpan={2} className="px-3 py-4 border-r border-slate-100">计量单位</th>
+                    <th rowSpan={2} className="px-3 py-4 border-r border-slate-100">工程量</th>
+                    <th colSpan={2} className="px-3 py-2 border-r border-slate-200 bg-blue-50/10">金额（元）</th>
+                    <th colSpan={3} className="px-3 py-2 bg-emerald-50/10">其中</th>
+                  </tr>
+                  <tr className="text-[10px] text-slate-400 font-bold text-center border-b border-slate-200">
+                    <th className="px-3 py-2 border-r border-slate-100">综合单价</th>
+                    <th className="px-3 py-2 border-r border-slate-200">合价</th>
+                    <th className="px-3 py-2 border-r border-slate-100">人工费</th>
+                    <th className="px-3 py-2 border-r border-slate-100">机械费</th>
+                    <th className="px-3 py-2">暂估价</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-[13px]">
-                  <tr className="bg-blue-50/10">
+                  <tr className="bg-blue-50/5">
                     <td className="px-6 py-3.5 text-xs font-bold text-slate-300 border-r border-slate-50">1</td>
                     <td className="px-6 py-3.5 border-r border-slate-50"></td>
                     <td className="px-6 py-3.5 border-r border-slate-50"></td>
@@ -700,8 +809,11 @@ const OKContractCompareView: React.FC = () => {
                     <td className="px-6 py-3.5 border-r border-slate-50"></td>
                     <td className="px-6 py-3.5 border-r border-slate-50"></td>
                     <td className="px-6 py-3.5 border-r border-slate-50"></td>
-                    <td className="px-6 py-3.5 text-right font-bold text-slate-900 border-r border-slate-50">12,728,148.12</td>
-                    <td className="px-6 py-3.5"></td>
+                    <td className="px-6 py-3.5 border-r border-slate-50 text-right"></td>
+                    <td className="px-6 py-3.5 border-r border-slate-50 text-right font-black text-slate-900">12,728,148.12</td>
+                    <td className="px-6 py-3.5 border-r border-slate-50 text-right font-medium text-slate-500">1,939,147.49</td>
+                    <td className="px-6 py-3.5 border-r border-slate-50 text-right font-medium text-slate-500">1,581,067.72</td>
+                    <td className="px-6 py-3.5 text-right font-medium text-slate-500">1,193,645.00</td>
                   </tr>
                   <tr>
                     <td className="px-6 py-3.5 text-xs font-bold text-slate-300 border-r border-slate-50">2</td>
@@ -711,9 +823,13 @@ const OKContractCompareView: React.FC = () => {
                     <td className="px-6 py-3.5 text-[11px] text-slate-400 leading-relaxed border-r border-slate-50">桩径Φ600 钢护筒埋设及拆除...</td>
                     <td className="px-6 py-3.5 text-center text-slate-500 border-r border-slate-50">m</td>
                     <td className="px-6 py-3.5 text-center font-bold text-slate-700 border-r border-slate-50">698</td>
-                    <td className="px-6 py-3.5 text-right font-black text-blue-600 border-r border-slate-50">63,636.66</td>
-                    <td className="px-6 py-3.5 text-slate-300">-</td>
+                    <td className="px-6 py-3.5 border-r border-slate-50 text-right">90.00</td>
+                    <td className="px-6 py-3.5 border-r border-slate-50 text-right font-black text-blue-600">63,636.66</td>
+                    <td className="px-6 py-3.5 border-r border-slate-50 text-right text-slate-600">20,472.34</td>
+                    <td className="px-6 py-3.5 border-r border-slate-50 text-right text-slate-600">25,302.50</td>
+                    <td className="px-6 py-3.5 text-right text-slate-600">14,302.04</td>
                   </tr>
+                  {/* 可以继续添加更多模拟数据行 */}
                 </tbody>
               </table>
             </div>
@@ -722,6 +838,189 @@ const OKContractCompareView: React.FC = () => {
       </div>
     </div>
   );
+
+  // 渲染列映射配置弹窗
+  const renderMappingModal = () => {
+    if (!isMappingModalOpen) return null;
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-lg shadow-2xl w-full max-w-[500px] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <h3 className="text-lg font-medium text-slate-700">手动列映射设置</h3>
+            <button 
+              onClick={() => setIsMappingModalOpen(false)}
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <Icon name="X" size={20} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-8 space-y-6">
+            <div className="bg-[#f8f9fa] p-5 rounded-md space-y-3">
+              <h4 className="text-sm font-bold text-slate-600">说明</h4>
+              <p className="text-[13px] text-slate-500 leading-relaxed">请输入Excel中各字段对应的列字母 (A-Z)</p>
+              <p className="text-[13px] text-slate-500 leading-relaxed">例如：项目编码在B列，则输入B</p>
+              <p className="text-[13px] text-[#f39c12] font-bold">• 项目名称和综合单价为必填项</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center group">
+                <label className="w-24 text-[13px] font-medium text-slate-600 shrink-0 text-right pr-4">项目编码列</label>
+                <input 
+                  type="text"
+                  placeholder="可空，例如：A或B"
+                  value={columnMapping.code}
+                  onChange={(e) => setColumnMapping({...columnMapping, code: e.target.value.toUpperCase()})}
+                  className="flex-1 h-9 bg-white border border-slate-200 rounded px-3 text-[13px] text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center group">
+                <label className="w-24 text-[13px] font-medium text-slate-600 shrink-0 text-right pr-4">
+                  <span className="text-red-500 mr-1">*</span>项目名称列
+                </label>
+                <input 
+                  type="text"
+                  value={columnMapping.name}
+                  onChange={(e) => setColumnMapping({...columnMapping, name: e.target.value.toUpperCase()})}
+                  className="flex-1 h-9 bg-white border border-slate-200 rounded px-3 text-[13px] text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center group">
+                <label className="w-24 text-[13px] font-medium text-slate-600 shrink-0 text-right pr-4">项目特征列</label>
+                <input 
+                  type="text"
+                  value={columnMapping.features}
+                  onChange={(e) => setColumnMapping({...columnMapping, features: e.target.value.toUpperCase()})}
+                  className="flex-1 h-9 bg-white border border-slate-200 rounded px-3 text-[13px] text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center group">
+                <label className="w-24 text-[13px] font-medium text-slate-600 shrink-0 text-right pr-4">计量单位列</label>
+                <input 
+                  type="text"
+                  value={columnMapping.unit}
+                  onChange={(e) => setColumnMapping({...columnMapping, unit: e.target.value.toUpperCase()})}
+                  className="flex-1 h-9 bg-white border border-slate-200 rounded px-3 text-[13px] text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 transition-all"
+                />
+              </div>
+
+              <div className="flex items-center group">
+                <label className="w-24 text-[13px] font-medium text-slate-600 shrink-0 text-right pr-4">
+                  <span className="text-red-500 mr-1">*</span>综合单价列
+                </label>
+                <input 
+                  type="text"
+                  value={columnMapping.price}
+                  onChange={(e) => setColumnMapping({...columnMapping, price: e.target.value.toUpperCase()})}
+                  className="flex-1 h-9 bg-white border border-slate-200 rounded px-3 text-[13px] text-slate-700 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/10 transition-all"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="px-8 py-4 border-t border-slate-100 flex items-center justify-end space-x-3 shrink-0">
+            <button 
+              onClick={() => setIsMappingModalOpen(false)}
+              className="px-5 py-2 border border-slate-200 rounded text-[13px] font-medium text-slate-500 hover:bg-slate-50 transition-colors outline-none"
+            >
+              取消
+            </button>
+            <button 
+              onClick={() => {
+                setColumnMapping({ code: '', name: '', features: '', unit: '', price: '' });
+                setIsManualMappingApplied(false);
+              }}
+              className="px-5 py-2 border border-slate-200 rounded text-[13px] font-medium text-slate-500 hover:bg-slate-50 transition-colors outline-none"
+            >
+              重置为自动识别
+            </button>
+            <button 
+              onClick={() => {
+                setIsManualMappingApplied(true);
+                setIsMappingModalOpen(false);
+              }}
+              className="px-6 py-2 bg-[#4dabf7] hover:bg-blue-600 text-white rounded text-[13px] font-bold shadow-sm transition-all active:scale-95 outline-none"
+            >
+              应用
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 渲染二次确认提示弹窗
+  const renderSheetChangeConfirmModal = () => {
+    if (!isSheetConfirmModalOpen) return null;
+    return (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/45 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="bg-white rounded-lg shadow-2xl w-full max-w-[500px] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <h3 className="text-lg font-medium text-slate-700">提示</h3>
+            <button 
+              onClick={() => setIsSheetConfirmModalOpen(false)}
+              className="text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <Icon name="X" size={20} />
+            </button>
+          </div>
+
+          <div className="p-8 flex flex-col items-start">
+             <div className="flex items-start space-x-4 mb-6">
+                <div className="w-10 h-10 bg-amber-50 rounded-full flex items-center justify-center shrink-0">
+                   <Icon name="AlertCircle" size={24} className="text-amber-500" fill="currentColor" strokeWidth={1} />
+                </div>
+                <div className="space-y-4">
+                   <p className="text-[15px] text-slate-600 leading-relaxed">
+                     当前页面数据展示为手动映射，加入文件后会套用当前手动映射关系，是否继续？
+                   </p>
+                   <label className="flex items-center space-x-2 cursor-pointer group w-fit">
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${dontShowMappingWarning ? 'bg-blue-500 border-blue-500' : 'border-slate-300 group-hover:border-blue-400'}`}>
+                         {dontShowMappingWarning && <Icon name="Check" size={12} className="text-white" strokeWidth={3} />}
+                      </div>
+                      <input 
+                        type="checkbox" 
+                        className="hidden" 
+                        checked={dontShowMappingWarning} 
+                        onChange={(e) => setDontShowMappingWarning(e.target.checked)} 
+                      />
+                      <span className="text-sm text-slate-500 font-medium">此次比价不再提示</span>
+                   </label>
+                </div>
+             </div>
+          </div>
+
+          <div className="px-8 py-4 border-t border-slate-50 flex items-center justify-end space-x-3 shrink-0 bg-slate-50/30">
+            <button 
+              onClick={() => setIsSheetConfirmModalOpen(false)}
+              className="px-6 py-2 bg-white border border-slate-200 rounded text-[14px] font-medium text-slate-600 hover:bg-slate-50 transition-colors outline-none"
+            >
+              取消
+            </button>
+            <button 
+              onClick={() => {
+                if (pendingSheetToggle) {
+                  if (pendingSheetToggle.startsWith('BATCH:')) {
+                    const [, fileId, isAllSelectedStr] = pendingSheetToggle.split(':');
+                    applyFolderSelection(fileId, isAllSelectedStr === 'true');
+                  } else {
+                    applySheetToggle(pendingSheetToggle);
+                  }
+                }
+                setIsSheetConfirmModalOpen(false);
+              }}
+              className="px-8 py-2 bg-[#4dabf7] hover:bg-blue-600 text-white rounded text-[14px] font-bold shadow-sm transition-all active:scale-95 outline-none"
+            >
+              继续
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const renderContent = () => {
     switch (viewState) {
@@ -732,7 +1031,13 @@ const OKContractCompareView: React.FC = () => {
     }
   };
 
-  return <div className="flex-1 flex flex-col h-full bg-white animate-in fade-in duration-300 overflow-hidden">{renderContent()}</div>;
+  return (
+    <div className="flex-1 flex flex-col h-full bg-white animate-in fade-in duration-300 overflow-hidden relative">
+      {renderContent()}
+      {renderMappingModal()}
+      {renderSheetChangeConfirmModal()}
+    </div>
+  );
 };
 
 export default OKContractCompareView;
