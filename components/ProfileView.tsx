@@ -100,9 +100,10 @@ const ProfileView: React.FC = () => {
   const [selectedToolToPay, setSelectedToolToPay] = useState<ToolItem | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('month');
   const [selectedMemberPlanId, setSelectedMemberPlanId] = useState<string>('quarter');
-  const [paymentMethod, setPaymentMethod] = useState<'wechat' | 'alipay'>('wechat');
   const [superMemberType, setSuperMemberType] = useState<SuperMemberType>('none');
   const [isMemberPayModalOpen, setIsMemberPayModalOpen] = useState(false);
+  const [toolPayStep, setToolPayStep] = useState<'select' | 'pay'>('select');
+  const [memberPayStep, setMemberPayStep] = useState<'select' | 'pay'>('select');
   
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>(INITIAL_INVOICES);
@@ -246,6 +247,7 @@ const ProfileView: React.FC = () => {
     setSelectedToolToPay(null);
     setActiveTab('value');
     setSelectedMemberPlanId('year');
+    setMemberPayStep('select');
     setIsMemberPayModalOpen(true);
   };
 
@@ -253,7 +255,7 @@ const ProfileView: React.FC = () => {
     e.stopPropagation();
     setSelectedToolToPay(tool);
     setSelectedPlanId('month'); 
-    setPaymentMethod('wechat');
+    setToolPayStep('select');
   };
 
   const handleConfirmToolActivation = () => {
@@ -486,118 +488,123 @@ const ProfileView: React.FC = () => {
            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[720px] max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-slate-200">
              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
                 <h3 className="text-lg font-black text-slate-800 leading-tight">开通：{selectedToolToPay.name}</h3>
-                <button onClick={() => setSelectedToolToPay(null)} className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all outline-none"><Icon name="X" size={20} /></button>
+                <button onClick={() => { setSelectedToolToPay(null); setToolPayStep('select'); }} className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all outline-none"><Icon name="X" size={20} /></button>
              </div>
              
              <div className="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar">
-                <div className="max-w-3xl mx-auto space-y-6">
+               <div className="max-w-3xl mx-auto space-y-6">
                    <div className="space-y-4">
                       <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center space-x-2">
-                        <div className="w-1 h-4 bg-[#ee7e33] rounded-full"></div>
-                        <h4 className="text-sm font-black text-slate-700">选择授权套餐</h4>
-                        </div>
-                        <button
-                          onClick={handleOpenMemberPayFromTool}
-                          className="flex items-center space-x-2 text-[#D46B08] text-[12px] font-black hover:text-[#B45309] transition-colors"
-                        >
-                          <Icon name="Gift" size={14} />
-                          <span>全站会员低至0.81元/天，通享所有模块！</span>
-                          <Icon name="ChevronRight" size={14} />
-                        </button>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        {PAYMENT_PLANS.map(plan => {
-                          const isSelected = selectedPlanId === plan.id;
-                          return (
-                            <div 
-                              key={plan.id}
-                              onClick={() => setSelectedPlanId(plan.id)}
-                              className={`relative bg-white pt-8 pb-5 px-3 rounded-[24px] border-2 cursor-pointer transition-all duration-300 flex flex-col items-center ${isSelected ? 'border-[#ee7e33] bg-[#fffbf9] shadow-md shadow-orange-500/5' : 'border-slate-100 hover:border-slate-200'}`}
-                            >
-                               <div className={`absolute top-0 left-0 px-3 py-1 ${plan.badgeColor} text-white text-[9px] font-black rounded-tl-[21px] rounded-br-xl`}>
-                                 {plan.badge}
-                               </div>
-                               <div className="text-center space-y-3">
-                                  <p className={`text-[13px] font-black transition-colors ${isSelected ? 'text-[#b45309]' : 'text-slate-600'}`}>{plan.name}</p>
-                                  <div className="flex items-baseline justify-center text-slate-800">
-                                     <span className="text-sm font-black mr-0.5">¥</span>
-                                     <span className="text-4xl font-black tracking-tighter leading-none">{plan.price.toString().split('.')[0]}</span>
-                                     <span className="text-lg font-black">.{plan.price.toString().split('.')[1] || '9'}</span>
-                                  </div>
-                                  <p className="text-[10px] font-bold text-slate-400">{plan.footerText}</p>
-                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                   </div>
+                       <div className="flex items-center space-x-2">
+                       <div className="w-1 h-4 bg-[#ee7e33] rounded-full"></div>
+                       <h4 className="text-sm font-black text-slate-700">选择授权套餐</h4>
+                       </div>
+                       <button
+                         onClick={handleOpenMemberPayFromTool}
+                         className="flex items-center space-x-2 text-[#D46B08] text-[12px] font-black hover:text-[#B45309] transition-colors"
+                       >
+                         <Icon name="Gift" size={14} />
+                         <span>全站会员低至0.81元/天，通享所有模块！</span>
+                         <Icon name="ChevronRight" size={14} />
+                       </button>
+                     </div>
+                     <div className={`grid grid-cols-3 gap-4 ${toolPayStep === 'pay' ? 'pointer-events-none opacity-60' : ''}`}>
+                       {PAYMENT_PLANS.map(plan => {
+                         const isSelected = selectedPlanId === plan.id;
+                         return (
+                           <div 
+                             key={plan.id}
+                             onClick={() => setSelectedPlanId(plan.id)}
+                             className={`relative bg-white pt-8 pb-5 px-3 rounded-[24px] border-2 cursor-pointer transition-all duration-300 flex flex-col items-center ${isSelected ? 'border-[#ee7e33] bg-[#fffbf9] shadow-md shadow-orange-500/5' : 'border-slate-100 hover:border-slate-200'}`}
+                           >
+                              <div className={`absolute top-0 left-0 px-3 py-1 ${plan.badgeColor} text-white text-[9px] font-black rounded-tl-[21px] rounded-br-xl`}>
+                                {plan.badge}
+                              </div>
+                              <div className="text-center space-y-3">
+                                 <p className={`text-[13px] font-black transition-colors ${isSelected ? 'text-[#b45309]' : 'text-slate-600'}`}>{plan.name}</p>
+                                 <div className="flex items-baseline justify-center text-slate-800">
+                                    <span className="text-sm font-black mr-0.5">¥</span>
+                                    <span className="text-4xl font-black tracking-tighter leading-none">{plan.price.toString().split('.')[0]}</span>
+                                    <span className="text-lg font-black">.{plan.price.toString().split('.')[1] || '9'}</span>
+                                 </div>
+                                 <p className="text-[10px] font-bold text-slate-400">{plan.footerText}</p>
+                              </div>
+                           </div>
+                         );
+                       })}
+                     </div>
+                  </div>
 
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                      <div className="space-y-6">
-                         <div className="space-y-3">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
-                              <h4 className="text-sm font-black text-slate-700">支付方式</h4>
-                            </div>
-                            <div className="flex space-x-3">
-                               <button 
-                                 onClick={() => setPaymentMethod('wechat')}
-                                 className={`flex-1 h-12 flex items-center justify-center space-x-2 rounded-xl border-2 transition-all font-black text-xs ${paymentMethod === 'wechat' ? 'border-[#07c160] bg-[#07c160]/5 text-[#07c160]' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
-                               >
-                                  <Icon name="MessageCircle" size={16} fill={paymentMethod === 'wechat' ? 'currentColor' : 'none'} />
-                                  <span>微信支付</span>
-                               </button>
-                               <button 
-                                 onClick={() => setPaymentMethod('alipay')}
-                                 className={`flex-1 h-12 flex items-center justify-center space-x-2 rounded-xl border-2 transition-all font-black text-xs ${paymentMethod === 'alipay' ? 'border-[#1677ff] bg-[#1677ff]/5 text-[#1677ff]' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
-                               >
-                                  <Icon name="Zap" size={16} fill={paymentMethod === 'alipay' ? 'currentColor' : 'none'} />
-                                  <span>支付宝</span>
-                               </button>
-                            </div>
-                         </div>
-                         <div className="bg-slate-50/50 rounded-2xl p-5 space-y-3 border border-slate-100">
-                            <div className="flex items-center justify-between px-1 text-[11px] font-bold text-slate-400">
-                               <span>套餐原价</span>
-                               <span className="line-through">¥ {currentPlan.originalPrice}</span>
-                            </div>
-                            <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between px-1">
-                               <span className="text-xs font-black text-slate-800">应付金额</span>
-                               <div className="flex items-baseline text-[#ee7e33]">
-                                  <span className="text-xs font-black mr-1">¥</span>
-                                  <span className="text-2xl font-black">{currentPlan.price}</span>
-                               </div>
-                            </div>
-                         </div>
-                      </div>
-                      <div className="bg-[#f8f9fb] rounded-[32px] p-6 border border-slate-100 flex flex-col items-center justify-center space-y-4">
-                         <div className="w-32 h-32 bg-white rounded-2xl shadow-xl border border-slate-100 flex items-center justify-center p-4 relative group">
-                            <Icon name="QrCode" size={60} className="text-slate-100 group-hover:text-slate-200 transition-colors" strokeWidth={1} />
-                            <div className="absolute inset-0 flex items-center justify-center"><span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Waiting</span></div>
-                         </div>
-                         <div className="text-center space-y-1">
-                            <p className="text-[13px] font-black text-slate-700">使用{paymentMethod === 'wechat' ? '微信' : '支付宝'}扫码</p>
-                            <p className="text-[10px] font-bold text-slate-400">支付成功后自动授权</p>
-                         </div>
-                      </div>
-                   </div>
-                </div>
+                  {toolPayStep === 'pay' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                       <div className="space-y-6">
+                          <div className="space-y-3">
+                             <div className="flex items-center space-x-2">
+                               <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
+                               <h4 className="text-sm font-black text-slate-700">扫码支付</h4>
+                             </div>
+                          </div>
+                          <div className="bg-slate-50/50 rounded-2xl p-5 space-y-3 border border-slate-100">
+                             <div className="flex items-center justify-between px-1 text-[11px] font-bold text-slate-400">
+                                <span>套餐原价</span>
+                                <span className="line-through">¥ {currentPlan.originalPrice}</span>
+                             </div>
+                             <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between px-1">
+                                <span className="text-xs font-black text-slate-800">应付金额</span>
+                                <div className="flex items-baseline text-[#ee7e33]">
+                                   <span className="text-xs font-black mr-1">¥</span>
+                                   <span className="text-2xl font-black">{currentPlan.price}</span>
+                                </div>
+                             </div>
+                          </div>
+                       </div>
+                       <div className="bg-[#f8f9fb] rounded-[32px] p-6 border border-slate-100 flex flex-col items-center justify-center space-y-4">
+                          <div className="w-32 h-32 bg-white rounded-2xl shadow-xl border border-slate-100 flex items-center justify-center p-4 relative group">
+                             <Icon name="QrCode" size={60} className="text-slate-100 group-hover:text-slate-200 transition-colors" strokeWidth={1} />
+                             <div className="absolute inset-0 flex items-center justify-center"><span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Waiting</span></div>
+                          </div>
+                          <div className="text-center space-y-1">
+                             <p className="text-[13px] font-black text-slate-700">支持微信、支付宝</p>
+                             <p className="text-[10px] font-bold text-slate-400">支付成功后自动授权</p>
+                          </div>
+                       </div>
+                    </div>
+                  )}
+               </div>
              </div>
 
              <div className="px-6 py-4 border-t border-slate-100 flex items-center space-x-4 shrink-0 bg-[#f8fafc]">
-                <button 
-                  onClick={() => setSelectedToolToPay(null)}
-                  className="flex-1 py-3 bg-slate-50 text-slate-500 rounded-full font-black text-[13px] hover:bg-slate-100 transition-all active:scale-95 border border-slate-200 shadow-sm"
-                >
-                  暂不支付
-                </button>
-                <button 
-                  onClick={handleConfirmToolActivation}
-                  className="flex-1 py-3 bg-[#5c67f2] text-white rounded-full font-black text-[13px] shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95"
-                >
-                  我已完成支付
-                </button>
+               {toolPayStep === 'select' ? (
+                 <>
+                   <button 
+                     onClick={() => { setSelectedToolToPay(null); setToolPayStep('select'); }}
+                     className="flex-1 py-3 bg-slate-50 text-slate-500 rounded-full font-black text-[13px] hover:bg-slate-100 transition-all active:scale-95 border border-slate-200 shadow-sm"
+                   >
+                     暂不支付
+                   </button>
+                   <button 
+                     onClick={() => setToolPayStep('pay')}
+                     className="flex-1 py-3 bg-[#5c67f2] text-white rounded-full font-black text-[13px] shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95"
+                   >
+                     确定并去支付
+                   </button>
+                 </>
+               ) : (
+                 <>
+                   <button 
+                     onClick={() => setToolPayStep('select')}
+                     className="flex-1 py-3 bg-slate-50 text-slate-500 rounded-full font-black text-[13px] hover:bg-slate-100 transition-all active:scale-95 border border-slate-200 shadow-sm"
+                   >
+                     返回选择
+                   </button>
+                   <button 
+                     onClick={handleConfirmToolActivation}
+                     className="flex-1 py-3 bg-[#5c67f2] text-white rounded-full font-black text-[13px] shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95"
+                   >
+                     我已完成支付
+                   </button>
+                 </>
+               )}
              </div>
            </div>
         </div>
@@ -608,7 +615,7 @@ const ProfileView: React.FC = () => {
            <div className="bg-white rounded-[24px] shadow-2xl w-full max-w-[720px] max-h-[92vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-slate-200">
              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
                 <h3 className="text-lg font-black text-slate-800 leading-tight">开通：艾造价全站会员</h3>
-                <button onClick={() => setIsMemberPayModalOpen(false)} className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all outline-none"><Icon name="X" size={20} /></button>
+                <button onClick={() => { setIsMemberPayModalOpen(false); setMemberPayStep('select'); }} className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-50 rounded-full transition-all outline-none"><Icon name="X" size={20} /></button>
              </div>
              
              <div className="flex-1 overflow-y-auto p-6 bg-white custom-scrollbar">
@@ -618,7 +625,7 @@ const ProfileView: React.FC = () => {
                         <div className="w-1 h-4 bg-[#ee7e33] rounded-full"></div>
                         <h4 className="text-sm font-black text-slate-700">选择会员套餐</h4>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className={`grid grid-cols-2 gap-4 ${memberPayStep === 'pay' ? 'pointer-events-none opacity-60' : ''}`}>
                         {MEMBER_PLANS.map(plan => {
                           const isSelected = selectedMemberPlanId === plan.id;
                           return (
@@ -645,71 +652,76 @@ const ProfileView: React.FC = () => {
                       </div>
                    </div>
 
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                      <div className="space-y-6">
-                         <div className="space-y-3">
-                            <div className="flex items-center space-x-2">
-                              <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
-                              <h4 className="text-sm font-black text-slate-700">支付方式</h4>
-                            </div>
-                            <div className="flex space-x-3">
-                               <button 
-                                 onClick={() => setPaymentMethod('wechat')}
-                                 className={`flex-1 h-12 flex items-center justify-center space-x-2 rounded-xl border-2 transition-all font-black text-xs ${paymentMethod === 'wechat' ? 'border-[#07c160] bg-[#07c160]/5 text-[#07c160]' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
-                               >
-                                  <Icon name="MessageCircle" size={16} fill={paymentMethod === 'wechat' ? 'currentColor' : 'none'} />
-                                  <span>微信支付</span>
-                               </button>
-                               <button 
-                                 onClick={() => setPaymentMethod('alipay')}
-                                 className={`flex-1 h-12 flex items-center justify-center space-x-2 rounded-xl border-2 transition-all font-black text-xs ${paymentMethod === 'alipay' ? 'border-[#1677ff] bg-[#1677ff]/5 text-[#1677ff]' : 'border-slate-100 text-slate-400 hover:border-slate-200'}`}
-                               >
-                                  <Icon name="Zap" size={16} fill={paymentMethod === 'alipay' ? 'currentColor' : 'none'} />
-                                  <span>支付宝</span>
-                               </button>
-                            </div>
-                         </div>
-                         <div className="bg-slate-50/50 rounded-2xl p-5 space-y-3 border border-slate-100">
-                            <div className="flex items-center justify-between px-1 text-[11px] font-bold text-slate-400">
-                               <span>套餐原价</span>
-                               <span className="line-through">¥ {MEMBER_PLANS.find(p => p.id === selectedMemberPlanId)?.originalPrice}</span>
-                            </div>
-                            <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between px-1">
-                               <span className="text-xs font-black text-slate-800">应付金额</span>
-                               <div className="flex items-baseline text-[#ee7e33]">
-                                  <span className="text-xs font-black mr-1">¥</span>
-                                  <span className="text-2xl font-black">{MEMBER_PLANS.find(p => p.id === selectedMemberPlanId)?.price}</span>
-                               </div>
-                            </div>
-                         </div>
-                      </div>
-                      <div className="bg-[#f8f9fb] rounded-[32px] p-6 border border-slate-100 flex flex-col items-center justify-center space-y-4">
-                         <div className="w-32 h-32 bg-white rounded-2xl shadow-xl border border-slate-100 flex items-center justify-center p-4 relative group">
-                            <Icon name="QrCode" size={60} className="text-slate-100 group-hover:text-slate-200 transition-colors" strokeWidth={1} />
-                            <div className="absolute inset-0 flex items-center justify-center"><span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Waiting</span></div>
-                         </div>
-                         <div className="text-center space-y-1">
-                            <p className="text-[13px] font-black text-slate-700">使用{paymentMethod === 'wechat' ? '微信' : '支付宝'}扫码</p>
-                            <p className="text-[10px] font-bold text-slate-400">支付成功后自动授权</p>
-                         </div>
-                      </div>
-                   </div>
+                   {memberPayStep === 'pay' && (
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                        <div className="space-y-6">
+                           <div className="space-y-3">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
+                                <h4 className="text-sm font-black text-slate-700">扫码支付</h4>
+                              </div>
+                           </div>
+                           <div className="bg-slate-50/50 rounded-2xl p-5 space-y-3 border border-slate-100">
+                              <div className="flex items-center justify-between px-1 text-[11px] font-bold text-slate-400">
+                                 <span>套餐原价</span>
+                                 <span className="line-through">¥ {MEMBER_PLANS.find(p => p.id === selectedMemberPlanId)?.originalPrice}</span>
+                              </div>
+                              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between px-1">
+                                 <span className="text-xs font-black text-slate-800">应付金额</span>
+                                 <div className="flex items-baseline text-[#ee7e33]">
+                                    <span className="text-xs font-black mr-1">¥</span>
+                                    <span className="text-2xl font-black">{MEMBER_PLANS.find(p => p.id === selectedMemberPlanId)?.price}</span>
+                                 </div>
+                              </div>
+                           </div>
+                        </div>
+                        <div className="bg-[#f8f9fb] rounded-[32px] p-6 border border-slate-100 flex flex-col items-center justify-center space-y-4">
+                           <div className="w-32 h-32 bg-white rounded-2xl shadow-xl border border-slate-100 flex items-center justify-center p-4 relative group">
+                              <Icon name="QrCode" size={60} className="text-slate-100 group-hover:text-slate-200 transition-colors" strokeWidth={1} />
+                              <div className="absolute inset-0 flex items-center justify-center"><span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Waiting</span></div>
+                           </div>
+                           <div className="text-center space-y-1">
+                              <p className="text-[13px] font-black text-slate-700">支持微信、支付宝</p>
+                              <p className="text-[10px] font-bold text-slate-400">支付成功后自动授权</p>
+                           </div>
+                        </div>
+                     </div>
+                   )}
                 </div>
              </div>
 
              <div className="px-6 py-4 border-t border-slate-100 flex items-center space-x-4 shrink-0 bg-[#f8fafc]">
-                <button 
-                  onClick={() => setIsMemberPayModalOpen(false)}
-                  className="flex-1 py-3 bg-slate-50 text-slate-500 rounded-full font-black text-[13px] hover:bg-slate-100 transition-all active:scale-95 border border-slate-200 shadow-sm"
-                >
-                  暂不支付
-                </button>
-                <button 
-                  onClick={handleConfirmMemberActivation}
-                  className="flex-1 py-3 bg-[#5c67f2] text-white rounded-full font-black text-[13px] shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95"
-                >
-                  我已完成支付
-                </button>
+               {memberPayStep === 'select' ? (
+                 <>
+                   <button 
+                     onClick={() => { setIsMemberPayModalOpen(false); setMemberPayStep('select'); }}
+                     className="flex-1 py-3 bg-slate-50 text-slate-500 rounded-full font-black text-[13px] hover:bg-slate-100 transition-all active:scale-95 border border-slate-200 shadow-sm"
+                   >
+                     暂不支付
+                   </button>
+                   <button 
+                     onClick={() => setMemberPayStep('pay')}
+                     className="flex-1 py-3 bg-[#5c67f2] text-white rounded-full font-black text-[13px] shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95"
+                   >
+                     确定并去支付
+                   </button>
+                 </>
+               ) : (
+                 <>
+                   <button 
+                     onClick={() => setMemberPayStep('select')}
+                     className="flex-1 py-3 bg-slate-50 text-slate-500 rounded-full font-black text-[13px] hover:bg-slate-100 transition-all active:scale-95 border border-slate-200 shadow-sm"
+                   >
+                     返回选择
+                   </button>
+                   <button 
+                     onClick={handleConfirmMemberActivation}
+                     className="flex-1 py-3 bg-[#5c67f2] text-white rounded-full font-black text-[13px] shadow-lg shadow-blue-500/20 hover:bg-blue-600 transition-all active:scale-95"
+                   >
+                     我已完成支付
+                   </button>
+                 </>
+               )}
              </div>
            </div>
         </div>
