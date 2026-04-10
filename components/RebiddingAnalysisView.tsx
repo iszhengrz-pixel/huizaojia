@@ -51,11 +51,11 @@ const RebiddingAnalysisView: React.FC = () => {
   });
 
   if (currentView === 'new') {
-    return <NewRebiddingProjectView onBack={() => setCurrentView('list')} mode="new" />;
+    return <NewRebiddingProjectView onBack={() => setCurrentView('list')} onReturnToList={() => setCurrentView('list')} mode="new" />;
   }
   
   if (currentView === 'edit') {
-    return <NewRebiddingProjectView onBack={() => setCurrentView('list')} mode="edit" />;
+    return <NewRebiddingProjectView onBack={() => setCurrentView('list')} onReturnToList={() => setCurrentView('list')} mode="edit" />;
   }
 
   return (
@@ -231,7 +231,6 @@ const RebiddingAnalysisView: React.FC = () => {
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
                         <th className="px-4 py-3 text-[13px] font-semibold text-slate-800">文件名</th>
-                        <th className="px-4 py-3 text-[13px] font-semibold text-slate-800">大小</th>
                         <th className="px-4 py-3 text-[13px] font-semibold text-slate-800">上传时间</th>
                       </tr>
                     </thead>
@@ -242,7 +241,6 @@ const RebiddingAnalysisView: React.FC = () => {
                             <Icon name="File" size={14} className="text-slate-400" />
                             <span>{file.name}</span>
                           </td>
-                          <td className="px-4 py-3 text-[13px] text-slate-500">{file.size}</td>
                           <td className="px-4 py-3 text-[13px] text-slate-500">{file.uploadTime}</td>
                         </tr>
                       ))}

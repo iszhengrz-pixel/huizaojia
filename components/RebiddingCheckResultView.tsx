@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import Icon from './Icon';
 
 interface RebiddingCheckResultViewProps {
   onBack: () => void;
+  onReturnToList?: () => void; // 新增属性，用于跨级返回列表页
   mode?: 'new' | 'edit';
 }
 
@@ -20,6 +21,7 @@ interface UnitCompareItem {
 interface CompareDrawerData {
   visible: boolean;
   view: 'price' | 'deviation';
+  activeTab?: 'data' | 'reason'; // 新增的 Tab 状态
   bidder: string;
   itemCode: string;
   itemName: string;
@@ -49,9 +51,10 @@ interface FilePreviewData {
   activeTab: string;
 }
 
-const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onBack, mode = 'new' }) => {
+const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onBack, onReturnToList, mode = 'new' }) => {
   const projectTitle = '宁波住宅项目-清标检查';
   const [currentStep, setCurrentStep] = useState<2 | 3>(2);
+  const [maxReachedStep, setMaxReachedStep] = useState<number>(2);
   const [activeTab, setActiveTab] = useState('summary');
   const [activeComplianceTab, setActiveComplianceTab] = useState('wrong');
   const [activeArithmeticTab, setActiveArithmeticTab] = useState('emptyZero');
@@ -60,6 +63,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showHeaderSettingsModal, setShowHeaderSettingsModal] = useState(false);
   const [compareSearchKeyword, setCompareSearchKeyword] = useState('');
+  const [activeCompareSheetTab, setActiveCompareSheetTab] = useState('sheet1'); // 清标对比表的 sheet 页签
   const [filePreviewData, setFilePreviewData] = useState<FilePreviewData>({
     visible: false,
     problemDescription: '',
@@ -74,6 +78,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
   const [compareDrawerData, setCompareDrawerData] = useState<CompareDrawerData>({
     visible: false,
     view: 'price',
+    activeTab: 'data',
     bidder: '',
     itemCode: '',
     itemName: '',
@@ -90,13 +95,130 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
 
   const availableHeaders = ['序号', '项目编码', '名称', '项目特征', '单位', '工程量', '单价', '合价', '综合单价', '暂估价', '备注'];
   // 默认AI识别的表头
-  const defaultAIHeaders = ['项目编码', '名称', '项目特征', '单位', '工程量'];
+  const defaultAIHeaders = ['序号', '项目编码', '名称', '项目特征', '单位'];
   const [selectedHeaders, setSelectedHeaders] = useState<string[]>(defaultAIHeaders);
+  const [showSummaryHeaderSettingsModal, setShowSummaryHeaderSettingsModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportSelection, setExportSelection] = useState<string[]>(['summary', 'compare', 'unit']);
+
+  const toggleExportSelection = (id: string) => {
+    setExportSelection(prev => 
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
+  const availableSummaryHeaders = ['序号', '项目名称'];
+  const [selectedSummaryHeaders, setSelectedSummaryHeaders] = useState<string[]>(availableSummaryHeaders);
 
   const toggleHeader = (header: string) => {
     setSelectedHeaders(prev => 
       prev.includes(header) ? prev.filter(h => h !== header) : [...prev, header]
     );
+  };
+  
+  const toggleSummaryHeader = (header: string) => {
+    setSelectedSummaryHeaders(prev => 
+      prev.includes(header) ? prev.filter(h => h !== header) : [...prev, header]
+    );
+  };
+
+  const [taxAmountType, setTaxAmountType] = useState<'tax' | 'noTax'>('noTax');
+  const [showTaxAmountSettingsDropdown, setShowTaxAmountSettingsDropdown] = useState(false);
+
+  // AI 整体分析状态
+  const [aiAnalysisStatus, setAiAnalysisStatus] = useState<'idle' | 'analyzing' | 'done'>('idle');
+  const [aiAnalysisProgress, setAiAnalysisProgress] = useState(0);
+  const [showAiAnalysisModal, setShowAiAnalysisModal] = useState(false);
+  const [hasGeneratedReport, setHasGeneratedReport] = useState(false);
+  const aiAnalysisIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleStartAiAnalysis = (forceReanalyze = false) => {
+    if (hasGeneratedReport && !forceReanalyze) {
+      setAiAnalysisStatus('done');
+      setShowAiAnalysisModal(true);
+      return;
+    }
+
+    setAiAnalysisStatus('analyzing');
+    setAiAnalysisProgress(0);
+    setShowAiAnalysisModal(true);
+
+    let progress = 0;
+    if (aiAnalysisIntervalRef.current) {
+      clearInterval(aiAnalysisIntervalRef.current);
+    }
+    
+    aiAnalysisIntervalRef.current = setInterval(() => {
+      progress += Math.floor(Math.random() * 15) + 5;
+      if (progress >= 100) {
+        progress = 100;
+        if (aiAnalysisIntervalRef.current) {
+          clearInterval(aiAnalysisIntervalRef.current);
+        }
+        setTimeout(() => {
+          setAiAnalysisStatus('done');
+          setHasGeneratedReport(true);
+        }, 500);
+      }
+      setAiAnalysisProgress(progress);
+    }, 400);
+  };
+
+  const handleCancelAiAnalysis = () => {
+    if (aiAnalysisIntervalRef.current) {
+      clearInterval(aiAnalysisIntervalRef.current);
+    }
+    setAiAnalysisStatus('idle');
+    setShowAiAnalysisModal(false);
+    setAiAnalysisProgress(0);
+  };
+
+  // AI 偏差原因分析状态
+  const [aiReasonAnalysisStatus, setAiReasonAnalysisStatus] = useState<'idle' | 'analyzing' | 'done'>('idle');
+  const [aiReasonAnalysisProgress, setAiReasonAnalysisProgress] = useState(0);
+  const [showAiReasonAnalysisModal, setShowAiReasonAnalysisModal] = useState(false);
+  const [hasGeneratedReasonReport, setHasGeneratedReasonReport] = useState(false);
+  const aiReasonAnalysisIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleStartAiReasonAnalysis = (forceReanalyze = false) => {
+    if (hasGeneratedReasonReport && !forceReanalyze) {
+      setAiReasonAnalysisStatus('done');
+      // 直接在抽屉里显示结果，不需要弹窗
+      return;
+    }
+
+    setAiReasonAnalysisStatus('analyzing');
+    setAiReasonAnalysisProgress(0);
+    setShowAiReasonAnalysisModal(true);
+
+    let progress = 0;
+    if (aiReasonAnalysisIntervalRef.current) {
+      clearInterval(aiReasonAnalysisIntervalRef.current);
+    }
+    
+    aiReasonAnalysisIntervalRef.current = setInterval(() => {
+      progress += Math.floor(Math.random() * 20) + 10;
+      if (progress >= 100) {
+        progress = 100;
+        if (aiReasonAnalysisIntervalRef.current) {
+          clearInterval(aiReasonAnalysisIntervalRef.current);
+        }
+        setTimeout(() => {
+          setAiReasonAnalysisStatus('done');
+          setHasGeneratedReasonReport(true);
+          setShowAiReasonAnalysisModal(false); // 分析完关闭进度弹窗
+        }, 500);
+      }
+      setAiReasonAnalysisProgress(progress);
+    }, 300);
+  };
+
+  const handleCancelAiReasonAnalysis = () => {
+    if (aiReasonAnalysisIntervalRef.current) {
+      clearInterval(aiReasonAnalysisIntervalRef.current);
+    }
+    setAiReasonAnalysisStatus('idle');
+    setShowAiReasonAnalysisModal(false);
+    setAiReasonAnalysisProgress(0);
   };
 
   const TABS = currentStep === 2 ? [
@@ -106,8 +228,9 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
     { id: 'unbalanced', label: '不平衡报价检查' },
     { id: 'collusion', label: '串标检查' }
   ] : [
+    { id: 'summaryCompare', label: '汇总对比表' },
     { id: 'compare', label: '清标对比表' },
-    { id: 'unitCompare', label: '单方对比汇总' }
+    { id: 'unitCompare', label: '单方对比表' }
   ];
 
   const COMPLIANCE_TABS = [
@@ -175,29 +298,143 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
     }
   ];
 
+  // 汇总对比表数据
+  const MOCK_SUMMARY_COMPARE_DATA = [
+    { id: '1', index: 1, name: '分部分项工程', controlPrice: 1000000.00, bidders: { '投标单位1 (一轮)': 1050000.00, '投标单位1 (二轮)': 1020000.00, '投标单位2 (一轮)': 980000.00, '投标单位2 (二轮)': 970000.00, '评标基准价/平均价': 1015000.00 } },
+    { id: '2', index: 2, name: '措施项目', controlPrice: 150000.00, bidders: { '投标单位1 (一轮)': 160000.00, '投标单位1 (二轮)': 155000.00, '投标单位2 (一轮)': 145000.00, '投标单位2 (二轮)': 140000.00, '评标基准价/平均价': 152500.00 } },
+    { id: '3', index: 3, name: '其他项目', controlPrice: 50000.00, bidders: { '投标单位1 (一轮)': 50000.00, '投标单位1 (二轮)': 49000.00, '投标单位2 (一轮)': 48000.00, '投标单位2 (二轮)': 48000.00, '评标基准价/平均价': 49000.00 } },
+    { id: '4', index: 4, name: '规费', controlPrice: 30000.00, bidders: { '投标单位1 (一轮)': 31500.00, '投标单位1 (二轮)': 30600.00, '投标单位2 (一轮)': 29400.00, '投标单位2 (二轮)': 29100.00, '评标基准价/平均价': 30450.00 } },
+    { id: '5', index: 5, name: '税金', controlPrice: 100000.00, bidders: { '投标单位1 (一轮)': 105000.00, '投标单位1 (二轮)': 102000.00, '投标单位2 (一轮)': 98000.00, '投标单位2 (二轮)': 97000.00, '评标基准价/平均价': 101500.00 } }
+  ];
+
+  const COMPARE_SHEET_TABS = [
+    { id: 'sheet1', label: '1-土石方工程' },
+    { id: 'sheet2', label: '2-基坑支护工程' },
+    { id: 'sheet3', label: '3-桩基工程' }
+  ];
+
   // 清标对比表数据
   const MOCK_COMPARE_DATA = [
-    { id: '1', code: '010101001001', name: '平整场地', feature: '这些根据不同的标底清单内容进行调整', unit: 'm2', quantity: 15, controlPrice: 15.5, bidders: { '投标单位1': 16.2, '投标单位2': 16.2, '评标基准价/平均价': 15.0 } },
-    { id: '2', code: '010101002001', name: '挖沟槽土方', feature: '-', unit: 'm3', quantity: 12, controlPrice: 28.0, bidders: { '投标单位1': 29.5, '投标单位2': 29.5, '评标基准价/平均价': 26.8 } },
-    { id: '3', code: '010103001001', name: '回填方', feature: '-', unit: 'm3', quantity: 18, controlPrice: 22.0, bidders: { '投标单位1': 21.0, '投标单位2': 23.5, '评标基准价/平均价': 22.5 } },
-    { id: '4', code: '010401001001', name: '砖基础', feature: '-', unit: 'm3', quantity: 9, controlPrice: 380.0, bidders: { '投标单位1': 395.0, '投标单位2': 375.0, '评标基准价/平均价': 382.0 } },
-    { id: '5', code: '010501001001', name: '垫层', feature: '-', unit: 'm3', quantity: 11, controlPrice: 450.0, bidders: { '投标单位1': 460.0, '投标单位2': 445.0, '评标基准价/平均价': 455.0 } },
+    { id: '1', code: '010101001001', name: '平整场地', feature: '这些根据不同的标底清单内容进行调整', unit: 'm2', quantity: 15, controlPrice: 15.5, bidders: { '投标单位1 (一轮)': 16.2, '投标单位1 (二轮)': 15.8, '投标单位2 (一轮)': 16.2, '投标单位2 (二轮)': 15.5, '评标基准价/平均价': 15.0 } },
+    { id: '2', code: '010101002001', name: '挖沟槽土方', feature: '-', unit: 'm3', quantity: 12, controlPrice: 28.0, bidders: { '投标单位1 (一轮)': 29.5, '投标单位1 (二轮)': 28.5, '投标单位2 (一轮)': 29.5, '投标单位2 (二轮)': 28.0, '评标基准价/平均价': 26.8 } },
+    { id: '3', code: '010103001001', name: '回填方', feature: '-', unit: 'm3', quantity: 18, controlPrice: 22.0, bidders: { '投标单位1 (一轮)': 21.0, '投标单位1 (二轮)': 20.5, '投标单位2 (一轮)': 23.5, '投标单位2 (二轮)': 22.5, '评标基准价/平均价': 22.5 } },
+    { id: '4', code: '010401001001', name: '砖基础', feature: '-', unit: 'm3', quantity: 9, controlPrice: 380.0, bidders: { '投标单位1 (一轮)': 395.0, '投标单位1 (二轮)': 385.0, '投标单位2 (一轮)': 375.0, '投标单位2 (二轮)': 370.0, '评标基准价/平均价': 382.0 } },
+    { id: '5', code: '010501001001', name: '垫层', feature: '-', unit: 'm3', quantity: 11, controlPrice: 450.0, bidders: { '投标单位1 (一轮)': 460.0, '投标单位1 (二轮)': 450.0, '投标单位2 (一轮)': 445.0, '投标单位2 (二轮)': 440.0, '评标基准价/平均价': 455.0 } },
   ];
-  const compareBidderKeys = Object.keys(MOCK_COMPARE_DATA[0]?.bidders || {});
-  const bidder1 = compareBidderKeys[0] || '投标单位1';
-  const bidder2 = compareBidderKeys[1] || '投标单位2';
-  const benchmarkBidder = compareBidderKeys[2] || '评标基准价/平均价';
+  
+  // 提取需要渲染的真实投标单位列表（排除标底、基准价等特殊列）
+  const compareBidderKeys = Object.keys(MOCK_COMPARE_DATA[0]?.bidders || {}).filter(k => k.startsWith('投标单位'));
+  const benchmarkBidder = '评标基准价/平均价';
+
+  const [sortedBidderKeys, setSortedBidderKeys] = useState<string[]>(compareBidderKeys);
+
+  const handleDragStart = (e: React.DragEvent, bidder: string) => {
+    e.dataTransfer.setData('text/plain', bidder);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, targetBidder: string) => {
+    e.preventDefault();
+    const sourceBidder = e.dataTransfer.getData('text/plain');
+    if (sourceBidder === targetBidder) return;
+
+    const newKeys = [...sortedBidderKeys];
+    const sourceIndex = newKeys.indexOf(sourceBidder);
+    const targetIndex = newKeys.indexOf(targetBidder);
+
+    if (sourceIndex !== -1 && targetIndex !== -1) {
+      newKeys.splice(sourceIndex, 1);
+      newKeys.splice(targetIndex, 0, sourceBidder);
+      setSortedBidderKeys(newKeys);
+    }
+  };
+
+  const [showBenchmarkModal, setShowBenchmarkModal] = useState(false);
+  const [appliedBenchmarkSettings, setAppliedBenchmarkSettings] = useState<{
+    type: 'none' | 'benchmark' | 'average';
+    formula: string;
+    selectedBidders: string[];
+  }>({
+    type: 'none',
+    formula: '1',
+    selectedBidders: []
+  });
+  const [tempBenchmarkSettings, setTempBenchmarkSettings] = useState(appliedBenchmarkSettings);
+
+  const handleOpenBenchmarkModal = () => {
+    setTempBenchmarkSettings({
+      ...appliedBenchmarkSettings,
+      selectedBidders: appliedBenchmarkSettings.selectedBidders.length > 0 
+        ? appliedBenchmarkSettings.selectedBidders 
+        : compareBidderKeys
+    });
+    setShowBenchmarkModal(true);
+  };
+
+  const getCalculatedBenchmarkPrice = (biddersData: Record<string, number>) => {
+    if (appliedBenchmarkSettings.type === 'none') return 0;
+    
+    if (appliedBenchmarkSettings.type === 'average') {
+      const selected = appliedBenchmarkSettings.selectedBidders.length > 0 ? appliedBenchmarkSettings.selectedBidders : compareBidderKeys;
+      if (selected.length === 0) return 0;
+      const sum = selected.reduce((acc, bidder) => acc + (biddersData[bidder] || 0), 0);
+      return sum / selected.length;
+    }
+    
+    if (appliedBenchmarkSettings.type === 'benchmark') {
+      const prices = compareBidderKeys.map(k => biddersData[k]).filter(p => typeof p === 'number');
+      if (prices.length === 0) return 0;
+      
+      const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+      const sorted = [...prices].sort((a, b) => a - b);
+      const secondLowest = sorted.length > 1 ? sorted[1] : sorted[0];
+      
+      switch(appliedBenchmarkSettings.formula) {
+        case '1': return avg;
+        case '2': return avg * 0.6 + secondLowest * 0.4;
+        case '3': return avg * 0.95;
+        case '4': return (avg + secondLowest) / 2;
+        case '5': {
+          const belowAvg = prices.filter(p => p < avg);
+          if (belowAvg.length === 0) return avg;
+          return belowAvg.reduce((a, b) => a + b, 0) / belowAvg.length;
+        }
+        case '6': return sorted[0];
+        default: return avg;
+      }
+    }
+    return 0;
+  };
+
+  // 公共的轮次标签渲染函数
+  const renderBidderLabel = (bidderName: string) => {
+    const nameMatch = bidderName.match(/^(.*?)\s*\((.*?)\)$/);
+    if (nameMatch) {
+      return (
+        <div className="flex items-center justify-center space-x-1">
+          <span>{nameMatch[1]}</span>
+          <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-xs whitespace-nowrap">{nameMatch[2]}</span>
+        </div>
+      );
+    }
+    return bidderName;
+  };
 
   // 单方对比汇总数据
   const [unitCompareData, setUnitCompareData] = useState<UnitCompareItem[]>([
-    { id: '1', level: 0, index: '一', name: '土建工程量清单', area: 192672.80, standard: 355282762.95, bidders: { '宁波建设': 334975149.49, '新盛恒': 329049049.40, '住宅': 351688581.52 } },
-    { id: '2', level: 1, index: '1', name: '支护工程(含管井及单体坑基围护)', area: 192672.80, standard: 61491676.89, bidders: { '宁波建设': 64598653.40, '新盛恒': 62878044.10, '住宅': 62321145.59 } },
-    { id: '3', level: 1, index: '2', name: '地下室土建', area: 55000.00, standard: 112019654.09, bidders: { '宁波建设': 113199759.70, '新盛恒': 102651587.40, '住宅': 113282547.49 } },
-    { id: '4', level: 1, index: '3', name: '地上土建', area: 137672.80, standard: 155495020.47, bidders: { '宁波建设': 136238138.80, '新盛恒': 142069300.89, '住宅': 150710646.54 } },
-    { id: '5', level: 0, index: '二', name: '安装工程量清单', area: 192673.00, standard: 18922636.73, bidders: { '宁波建设': 23104787.59, '新盛恒': 22567236.60, '住宅': 20700666.45 } },
-    { id: '6', level: 1, index: '1', name: '地下室安装', area: 55000.00, standard: 5294389.32, bidders: { '宁波建设': 6039742.01, '新盛恒': 5705120.62, '住宅': 5582316.91 } },
-    { id: '7', level: 0, index: '三', name: '包干措施费清单', area: 192673.00, standard: 50105782.04, bidders: { '宁波建设': 38879494.60, '新盛恒': 56656806.07, '住宅': 51618147.40 } },
-    { id: '8', level: 0, index: '四', name: '投标报价总计(一+二+三)', area: 0, standard: 424311181.72, bidders: { '宁波建设': 396959431.68, '新盛恒': 408273092.07, '住宅': 424007395.37 } },
+    { id: '1', level: 0, index: '一', name: '土建工程量清单', area: 192672.80, standard: 355282762.95, bidders: { '投标单位1 (一轮)': 334975149.49, '投标单位1 (二轮)': 329049049.40, '投标单位2 (一轮)': 351688581.52, '投标单位2 (二轮)': 341688581.52 } },
+    { id: '2', level: 1, index: '1', name: '支护工程(含管井及单体坑基围护)', area: 192672.80, standard: 61491676.89, bidders: { '投标单位1 (一轮)': 64598653.40, '投标单位1 (二轮)': 62878044.10, '投标单位2 (一轮)': 62321145.59, '投标单位2 (二轮)': 61321145.59 } },
+    { id: '3', level: 1, index: '2', name: '地下室土建', area: 55000.00, standard: 112019654.09, bidders: { '投标单位1 (一轮)': 113199759.70, '投标单位1 (二轮)': 102651587.40, '投标单位2 (一轮)': 113282547.49, '投标单位2 (二轮)': 111282547.49 } },
+    { id: '4', level: 1, index: '3', name: '地上土建', area: 137672.80, standard: 155495020.47, bidders: { '投标单位1 (一轮)': 136238138.80, '投标单位1 (二轮)': 142069300.89, '投标单位2 (一轮)': 150710646.54, '投标单位2 (二轮)': 145710646.54 } },
+    { id: '5', level: 0, index: '二', name: '安装工程量清单', area: 192673.00, standard: 18922636.73, bidders: { '投标单位1 (一轮)': 23104787.59, '投标单位1 (二轮)': 22567236.60, '投标单位2 (一轮)': 20700666.45, '投标单位2 (二轮)': 19700666.45 } },
+    { id: '6', level: 1, index: '1', name: '地下室安装', area: 55000.00, standard: 5294389.32, bidders: { '投标单位1 (一轮)': 6039742.01, '投标单位1 (二轮)': 5705120.62, '投标单位2 (一轮)': 5582316.91, '投标单位2 (二轮)': 5182316.91 } },
+    { id: '7', level: 0, index: '三', name: '包干措施费清单', area: 192673.00, standard: 50105782.04, bidders: { '投标单位1 (一轮)': 38879494.60, '投标单位1 (二轮)': 56656806.07, '投标单位2 (一轮)': 51618147.40, '投标单位2 (二轮)': 50618147.40 } },
+    { id: '8', level: 0, index: '四', name: '投标报价总计(一+二+三)', area: 0, standard: 424311181.72, bidders: { '投标单位1 (一轮)': 396959431.68, '投标单位1 (二轮)': 408273092.07, '投标单位2 (一轮)': 424007395.37, '投标单位2 (二轮)': 412007395.37 } },
   ]);
 
   const handleUnitCompareAreaChange = (id: string, value: string) => {
@@ -274,15 +511,37 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
     samePriceBidders?: string[]
   ) => {
     const tr = (event.target as HTMLElement).closest('tr');
-    const diffPercent = ((bidderPrice - item.controlPrice) / item.controlPrice) * 100;
+    
+    // 偏差原因分析视图使用新的动态基准价
+    let basePrice = item.controlPrice;
+    if (view === 'deviation' && item.bidders) {
+      if (unbalancedSettings.quoteType === 'bidAvg') {
+        const allPrices = Object.keys(item.bidders).filter(k => k.startsWith('投标单位')).map(k => item.bidders![k as keyof typeof item.bidders] as number);
+        basePrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
+      } else if (unbalancedSettings.quoteType === 'bidLowest') {
+        const allPrices = Object.keys(item.bidders).filter(k => k.startsWith('投标单位')).map(k => item.bidders![k as keyof typeof item.bidders] as number);
+        basePrice = Math.min(...allPrices);
+      } else if (unbalancedSettings.quoteType === 'bidHighestLowestAvg') {
+        const allPrices = Object.keys(item.bidders).filter(k => k.startsWith('投标单位')).map(k => item.bidders![k as keyof typeof item.bidders] as number);
+        if (allPrices.length > 2) {
+          allPrices.sort((a, b) => a - b);
+          allPrices.shift(); // 移除最低
+          allPrices.pop(); // 移除最高
+        }
+        basePrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
+      }
+    }
+
+    const diffPercent = basePrice > 0 ? ((bidderPrice - basePrice) / basePrice) * 100 : 0;
     setCompareDrawerData({
       visible: true,
       view,
+      activeTab: 'data', // 每次打开重置为数据明细 Tab
       bidder,
       itemCode: item.code,
       itemName: item.name,
       unit: item.unit,
-      controlPrice: item.controlPrice,
+      controlPrice: basePrice, // 将 controlPrice 更新为实际比较的 basePrice 以供明细抽屉使用
       bidderPrice,
       diffPercent,
       samePriceBidders,
@@ -439,40 +698,62 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
         </div>
         
         {/* 进度条区域 */}
-        <div className="flex-1 flex justify-center items-center">
-          <div className="flex items-center space-x-2">
-            {/* Step 1 */}
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400 text-xs font-bold border border-slate-200">1</div>
-              <span className="ml-2 text-sm font-medium text-slate-500">{mode === 'new' ? '新建项目' : '编辑项目'}</span>
-            </div>
-            
-            {/* Divider */}
-            <div className="w-12 h-[1px] bg-slate-300 mx-2"></div>
-            
-            {/* Step 2 */}
-            <div className="flex items-center">
-              <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${currentStep === 2 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>2</div>
-              <span className={`ml-2 text-sm font-medium ${currentStep === 2 ? 'text-blue-600' : 'text-slate-500'}`}>清标检查</span>
-            </div>
-            
-            {/* Divider */}
-            <div className="w-12 h-[1px] bg-slate-300 mx-2"></div>
-            
-            {/* Step 3 */}
-            <div className="flex items-center">
-              <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${currentStep === 3 ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>3</div>
-              <span className={`ml-2 text-sm font-medium ${currentStep === 3 ? 'text-blue-600' : 'text-slate-500'}`}>查看对比表</span>
-            </div>
-            
-            {/* Divider */}
-            <div className="w-12 h-[1px] bg-slate-300 mx-2"></div>
-            
-            {/* Step 4 */}
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400 text-xs font-bold border border-slate-200">4</div>
-              <span className="ml-2 text-sm font-medium text-slate-500">导出报告</span>
-            </div>
+        <div className="flex-1 flex justify-center items-center px-8">
+          <div className="flex w-full max-w-3xl gap-2">
+            {[
+              { id: 1, label: mode === 'new' ? '新建项目' : '编辑项目' },
+              { id: 2, label: '清标检查' },
+              { id: 3, label: '查看对比表' },
+              { id: 4, label: '导出报告' }
+            ].map(step => {
+              const isCompleted = currentStep > step.id;
+              const isActive = currentStep === step.id;
+              // 只要当前处于该步骤，或者该步骤已经被达到过，就被视为“可到达”的状态，但是已完成的步骤保持绿色对勾，仅仅是为了控制悬浮交互和点击权限
+              const isClickable = step.id <= maxReachedStep;
+              
+              const barColor = isCompleted ? 'bg-[#00C48C]' : isActive ? 'bg-blue-600' : 'bg-[#E5E6EB]';
+              const textColor = isCompleted ? 'text-[#333333] group-hover:text-green-600' : isActive ? 'text-blue-600 font-semibold' : 'text-[#999999]';
+
+              const handleClick = () => {
+                if (step.id === 1) {
+                  onBack();
+                } else if (step.id === 2 && currentStep !== 2 && isClickable) {
+                  setCurrentStep(2);
+                  setActiveTab('summary');
+                  closeCompareDrawer();
+                  closeProblemDetailDrawer();
+                } else if (step.id === 3 && currentStep !== 3 && isClickable) {
+                  setCurrentStep(3);
+                  setActiveTab('summaryCompare');
+                }
+              };
+
+              return (
+                <button 
+                  key={step.id}
+                  onClick={handleClick}
+                  className={`flex flex-col flex-1 text-left group ${isClickable ? 'cursor-pointer' : 'cursor-default'}`}
+                >
+                  {/* Top Bar */}
+                  <div className={`h-1 w-full rounded-full transition-colors ${barColor}`}></div>
+                  {/* Content */}
+                  <div className={`flex items-center mt-2 p-1.5 rounded-md transition-colors ${isCompleted ? 'group-hover:bg-green-50' : isClickable && !isActive ? 'group-hover:bg-blue-50' : ''}`}>
+                    {isCompleted ? (
+                      <svg className="w-4 h-4 text-[#00C48C] group-hover:text-green-600 transition-colors" viewBox="0 0 24 24" fill="currentColor">
+                        <path fillRule="evenodd" clipRule="evenodd" d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zm-1.177-5.177L17.53 10.12l-1.414-1.414-5.293 5.293-2.828-2.828-1.414 1.414 4.242 4.242z" />
+                      </svg>
+                    ) : isActive ? (
+                      <div className="flex items-center justify-center w-4 h-4 rounded-full border-2 border-blue-600">
+                        <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                      </div>
+                    ) : (
+                      <div className={`w-4 h-4 rounded-full border-2 transition-colors ${isClickable ? 'border-blue-300 group-hover:border-blue-400' : 'border-[#E5E6EB]'}`}></div>
+                    )}
+                    <span className={`ml-2 text-sm transition-colors ${textColor} ${isClickable && !isActive && !isCompleted ? 'group-hover:text-blue-500' : ''}`}>{step.label}</span>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -496,16 +777,32 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
             onClick={() => {
               if (currentStep === 2) {
                 setCurrentStep(3);
-                setActiveTab('compare');
-                closeProblemDetailDrawer();
+                setActiveTab('summaryCompare');
+                setMaxReachedStep(Math.max(maxReachedStep, 3));
               } else {
-                // TODO: 导出报告逻辑
+                alert('导出功能开发中');
               }
             }} 
             className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
           >
             {currentStep === 2 ? '查看对比表' : '导出报告'}
           </button>
+          {currentStep === 3 && (
+            <button 
+              onClick={() => {
+                // 模拟回标轮次+1并返回列表页的逻辑
+                alert('本轮回标已完成，即将返回列表页。下次操作将进入新一轮回标。');
+                if (onReturnToList) {
+                  onReturnToList();
+                } else {
+                  onBack();
+                }
+              }}
+              className="px-5 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors shadow-sm"
+            >
+              完成本轮回标
+            </button>
+          )}
         </div>
       </div>
 
@@ -514,20 +811,77 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
           
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
             {/* Tabs */}
-            <div className="flex bg-blue-50/50 border-b border-slate-200 px-2 pt-2">
-              {TABS.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabChange(tab.id)}
-                  className={`px-6 py-2.5 text-sm font-medium rounded-t-lg transition-colors ${
-                    activeTab === tab.id 
-                      ? 'bg-white text-slate-800 border border-slate-200 border-b-white relative top-[1px]' 
-                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <div className="flex bg-blue-50/50 border-b border-slate-200 px-2 pt-2 items-center justify-between">
+              <div className="flex">
+                {TABS.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`px-6 py-2.5 text-sm font-medium rounded-t-lg transition-colors ${
+                      activeTab === tab.id 
+                        ? 'bg-white text-slate-800 border border-slate-200 border-b-white relative top-[1px]' 
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+              {currentStep === 3 && (
+                <div className="pr-4 pb-1 flex items-center space-x-2">
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowTaxAmountSettingsDropdown(!showTaxAmountSettingsDropdown)} 
+                      className="px-3 py-1 text-sm font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition-colors flex items-center space-x-1"
+                    >
+                      <Icon name="Settings" size={14} />
+                      <span>金额设置</span>
+                    </button>
+                    {showTaxAmountSettingsDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-[100]" onClick={() => setShowTaxAmountSettingsDropdown(false)}></div>
+                        <div className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-[101] py-2 text-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                          <div className="px-4 py-2 text-slate-500 text-xs border-b border-slate-100 mb-1">显示设置</div>
+                          <label className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center space-x-3 cursor-pointer">
+                            <input 
+                              type="radio" 
+                              name="taxAmountType" 
+                              value="tax" 
+                              checked={taxAmountType === 'tax'} 
+                              onChange={() => { setTaxAmountType('tax'); setShowTaxAmountSettingsDropdown(false); }}
+                              className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
+                            />
+                            <span className="text-slate-700">含税金额</span>
+                          </label>
+                          <label className="w-full text-left px-4 py-2 hover:bg-slate-50 flex items-center space-x-3 cursor-pointer">
+                            <input 
+                              type="radio" 
+                              name="taxAmountType" 
+                              value="noTax" 
+                              checked={taxAmountType === 'noTax'} 
+                              onChange={() => { setTaxAmountType('noTax'); setShowTaxAmountSettingsDropdown(false); }}
+                              className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
+                            />
+                            <span className="text-slate-700">不含税金额</span>
+                          </label>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <button onClick={() => setShowSettingsModal(true)} className="px-3 py-1 text-sm font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition-colors flex items-center space-x-1">
+                    <Icon name="Settings" size={14} />
+                    <span>不平衡报价设置</span>
+                  </button>
+                  <button onClick={handleStartAiAnalysis} className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors flex items-center space-x-1 shadow-sm">
+                    <Icon name="Sparkles" size={14} />
+                    <span>AI整体分析</span>
+                  </button>
+                  <button onClick={() => setShowExportModal(true)} className="px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
+                    <Icon name="Download" size={14} />
+                    <span>导出报表</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Content Toolbar */}
@@ -933,8 +1287,136 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                   </table>
                 </div>
               )}
+              {activeTab === 'summaryCompare' && (
+                <div className="space-y-4">
+                  {/* 顶部操作区 */}
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                    <div className="text-sm text-slate-500">
+                      各投标单位及标底的汇总对比分析，可直观查看各部分费用的偏差情况
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <button onClick={() => setShowSummaryHeaderSettingsModal(true)} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition-colors flex items-center space-x-1">
+                        <Icon name="Columns" size={14} />
+                        <span>表头设置</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* 对比表格 */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-center border-collapse border border-slate-200 min-w-[1200px]">
+                      <thead className="bg-slate-50 text-[13px] text-slate-700 font-semibold">
+                        <tr>
+                          {selectedSummaryHeaders.includes('序号') && <th className="border border-slate-200 py-3 px-2 w-16" rowSpan={2}>序号</th>}
+                          {selectedSummaryHeaders.includes('项目名称') && <th className="border border-slate-200 py-3 px-4 min-w-[200px]" rowSpan={2}>项目名称</th>}
+                          <th className="border border-slate-200 py-2 px-4 bg-blue-50 text-blue-700" colSpan={taxAmountType === 'both' ? 2 : 1}>标底</th>
+                          {sortedBidderKeys.map(bidder => (
+                            <th 
+                              key={bidder} 
+                              className="border border-slate-200 py-2 px-4 cursor-grab active:cursor-grabbing hover:bg-slate-100 transition-colors group relative" 
+                              colSpan={taxAmountType === 'both' ? 3 : 2}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, bidder)}
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => handleDrop(e, bidder)}
+                            >
+                              <div className="flex items-center justify-center space-x-2">
+                                {renderBidderLabel(bidder)}
+                                <Icon name="GripVertical" size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2" />
+                              </div>
+                            </th>
+                          ))}
+                        </tr>
+                        <tr className="bg-slate-50 text-[12px] text-slate-600 font-medium">
+                          {(taxAmountType === 'both' || taxAmountType === 'noTax') && <th className="border border-slate-200 py-2 px-4 font-normal bg-blue-50/50">不含税金额(元)</th>}
+                          {(taxAmountType === 'both' || taxAmountType === 'tax') && <th className="border border-slate-200 py-2 px-4 font-normal bg-blue-50/50">含税金额(元)</th>}
+                          {sortedBidderKeys.map(bidder => (
+                            <React.Fragment key={bidder}>
+                              {(taxAmountType === 'both' || taxAmountType === 'noTax') && <th className="border border-slate-200 py-2 px-4 font-normal">不含税金额(元)</th>}
+                              {(taxAmountType === 'both' || taxAmountType === 'tax') && <th className="border border-slate-200 py-2 px-4 font-normal">含税金额(元)</th>}
+                              <th className="border border-slate-200 py-2 px-4 font-normal">偏差百分比</th>
+                            </React.Fragment>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-sm text-slate-600 bg-white">
+                        {MOCK_SUMMARY_COMPARE_DATA.map((item) => (
+                          <tr key={item.id} className="hover:bg-blue-50/30 transition-colors">
+                            {selectedSummaryHeaders.includes('序号') && <td className="border border-slate-200 py-2 px-2">{item.index}</td>}
+                            {selectedSummaryHeaders.includes('项目名称') && <td className="border border-slate-200 py-2 px-4 text-left">{item.name}</td>}
+                            {(taxAmountType === 'both' || taxAmountType === 'noTax') && <td className="border border-slate-200 py-2 px-4 font-mono text-right text-blue-700 bg-blue-50/30">{(item.controlPrice * 0.91).toFixed(2)}</td>}
+                            {(taxAmountType === 'both' || taxAmountType === 'tax') && <td className="border border-slate-200 py-2 px-4 font-mono text-right text-blue-700 bg-blue-50/30">{item.controlPrice.toFixed(2)}</td>}
+                            {sortedBidderKeys.map(bidder => {
+                              const price = item.bidders[bidder as keyof typeof item.bidders] as number;
+                              
+                              // 计算不平衡报价的基准价
+                              let basePrice = item.controlPrice;
+                              if (unbalancedSettings.quoteType === 'bidAvg') {
+                                const allPrices = Object.keys(item.bidders).filter(k => k.startsWith('投标单位')).map(k => item.bidders[k as keyof typeof item.bidders] as number);
+                                basePrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
+                              } else if (unbalancedSettings.quoteType === 'bidLowest') {
+                                const allPrices = Object.keys(item.bidders).filter(k => k.startsWith('投标单位')).map(k => item.bidders[k as keyof typeof item.bidders] as number);
+                                basePrice = Math.min(...allPrices);
+                              } else if (unbalancedSettings.quoteType === 'bidHighestLowestAvg') {
+                                const allPrices = Object.keys(item.bidders).filter(k => k.startsWith('投标单位')).map(k => item.bidders[k as keyof typeof item.bidders] as number);
+                                if (allPrices.length > 2) {
+                                  allPrices.sort((a, b) => a - b);
+                                  allPrices.shift(); // 移除最低
+                                  allPrices.pop(); // 移除最高
+                                }
+                                basePrice = allPrices.reduce((a, b) => a + b, 0) / allPrices.length;
+                              }
+
+                              const diffPercent = basePrice > 0 ? ((price - basePrice) / basePrice) * 100 : 0;
+                              const floatRange = parseFloat(unbalancedSettings.floatRange) || 0;
+                              const isExceeding = Math.abs(diffPercent) > floatRange;
+                              const diffClass = diffPercent > 0 ? 'text-red-500' : diffPercent < 0 ? 'text-green-500' : 'text-slate-600';
+                              
+                              return (
+                                <React.Fragment key={bidder}>
+                                  {(taxAmountType === 'both' || taxAmountType === 'noTax') && <td className="border border-slate-200 py-2 px-4 font-mono text-right">{(price * 0.91).toFixed(2)}</td>}
+                                  {(taxAmountType === 'both' || taxAmountType === 'tax') && <td className="border border-slate-200 py-2 px-4 font-mono text-right">{price.toFixed(2)}</td>}
+                                  <td className={`border border-slate-200 py-2 px-4 font-mono text-right ${diffClass} ${isExceeding ? 'bg-red-50/50' : ''}`}>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => openCompareDrawer('deviation', { ...item, code: '-', unit: '项' }, bidder, price, e)}
+                                      className="w-full text-right hover:underline"
+                                    >
+                                      {diffPercent > 0 ? '+' : ''}{diffPercent.toFixed(2)}%
+                                    </button>
+                                  </td>
+                                </React.Fragment>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
               {activeTab === 'compare' && (
                 <div className="space-y-4">
+                  {/* Sheet 页签 */}
+                  <div className="flex border-b border-slate-200">
+                    {COMPARE_SHEET_TABS.map(tab => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveCompareSheetTab(tab.id)}
+                        className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+                          activeCompareSheetTab === tab.id
+                            ? 'text-blue-600'
+                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {tab.label}
+                        {activeCompareSheetTab === tab.id && (
+                          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  
                   {/* 顶部操作区 */}
                   <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                     <div className="relative w-80">
@@ -952,13 +1434,9 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         <Icon name="Columns" size={14} />
                         <span>表头设置</span>
                       </button>
-                      <button onClick={() => setShowSettingsModal(true)} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition-colors flex items-center space-x-1">
+                      <button onClick={handleOpenBenchmarkModal} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 transition-colors flex items-center space-x-1">
                         <Icon name="Settings" size={14} />
-                        <span>不平衡报价设置</span>
-                      </button>
-                      <button className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
-                        <Icon name="Download" size={14} />
-                        <span>导出报表</span>
+                        <span>评标价设置</span>
                       </button>
                     </div>
                   </div>
@@ -968,37 +1446,56 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                     <table className="w-full min-w-[1900px] text-center border-collapse border border-slate-200">
                       <thead className="bg-slate-50 text-[13px] text-slate-700 font-semibold">
                         <tr>
-                          {selectedHeaders.includes('序号') && <th className="border border-slate-200 py-3 px-4 w-16 bg-slate-100 text-slate-700" rowSpan={2}>序号</th>}
+                          {selectedHeaders.includes('序号') && <th className="border border-slate-200 py-3 px-4 w-16 bg-slate-100 text-slate-700 whitespace-nowrap" rowSpan={2}>序号</th>}
                           {selectedHeaders.includes('项目编码') && <th className="border border-slate-200 py-3 px-4 bg-slate-100 text-slate-700" rowSpan={2}>项目编码</th>}
-                          {selectedHeaders.includes('名称') && <th className="border border-slate-200 py-3 px-4 bg-slate-100 text-slate-700" rowSpan={2}>名称</th>}
+                          {selectedHeaders.includes('名称') && <th className="border border-slate-200 py-3 px-4 bg-slate-100 text-slate-700 whitespace-nowrap" rowSpan={2}>名称</th>}
                           {selectedHeaders.includes('项目特征') && <th className="border border-slate-200 py-3 px-4 bg-slate-100 text-slate-700" rowSpan={2}>项目特征</th>}
-                          {selectedHeaders.includes('单位') && <th className="border border-slate-200 py-3 px-4 w-16 bg-slate-100 text-slate-700" rowSpan={2}>单位</th>}
-                          {selectedHeaders.includes('工程量') && <th className="border border-slate-200 py-3 px-4 w-24 bg-slate-100 text-slate-700" rowSpan={2}>工程量</th>}
+                          {selectedHeaders.includes('单位') && <th className="border border-slate-200 py-3 px-4 w-16 bg-slate-100 text-slate-700 whitespace-nowrap" rowSpan={2}>单位</th>}
+                          {selectedHeaders.includes('工程量') && <th className="border border-slate-200 py-3 px-4 w-24 bg-slate-100 text-slate-700 whitespace-nowrap" rowSpan={2}>工程量</th>}
                           {selectedHeaders.includes('单价') && <th className="border border-slate-200 py-3 px-4 w-24 bg-slate-100 text-slate-700" rowSpan={2}>单价</th>}
                           {selectedHeaders.includes('合价') && <th className="border border-slate-200 py-3 px-4 w-24 bg-slate-100 text-slate-700" rowSpan={2}>合价</th>}
                           {selectedHeaders.includes('综合单价') && <th className="border border-slate-200 py-3 px-4 w-24 bg-slate-100 text-slate-700" rowSpan={2}>综合单价</th>}
                           {selectedHeaders.includes('暂估价') && <th className="border border-slate-200 py-3 px-4 w-24 bg-slate-100 text-slate-700" rowSpan={2}>暂估价</th>}
                           {selectedHeaders.includes('备注') && <th className="border border-slate-200 py-3 px-4 bg-slate-100 text-slate-700" rowSpan={2}>备注</th>}
-                          <th className="border border-slate-200 py-2 px-4 bg-slate-50 text-slate-700" colSpan={3}>标底</th>
-                          <th className="border border-slate-200 py-2 px-4 bg-slate-50 text-slate-700" colSpan={4}>{bidder1}</th>
-                          <th className="border border-slate-200 py-2 px-4 bg-slate-50 text-slate-700" colSpan={4}>{bidder2}</th>
-                          <th className="border border-slate-200 py-2 px-4 bg-slate-50 text-slate-700" colSpan={3}>{benchmarkBidder}</th>
+                          <th className="border border-slate-200 py-2 px-4 bg-blue-50 text-blue-700" colSpan={3}>标底</th>
+                          {sortedBidderKeys.map(bidder => (
+                            <th 
+                              key={bidder} 
+                              className="border border-slate-200 py-2 px-4 bg-slate-50 text-slate-700 cursor-grab active:cursor-grabbing hover:bg-slate-100 transition-colors group relative" 
+                              colSpan={4}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, bidder)}
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => handleDrop(e, bidder)}
+                            >
+                              <div className="flex items-center justify-center space-x-2">
+                                {renderBidderLabel(bidder)}
+                                <Icon name="GripVertical" size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2" />
+                              </div>
+                            </th>
+                          ))}
+                          {appliedBenchmarkSettings.type === 'benchmark' && <th className="border border-slate-200 py-2 px-4 bg-slate-50 text-slate-700" colSpan={3}>评标基准价</th>}
+                          {appliedBenchmarkSettings.type === 'average' && <th className="border border-slate-200 py-2 px-4 bg-slate-50 text-slate-700" colSpan={3}>评标平均价</th>}
                         </tr>
                         <tr className="bg-slate-50 text-[12px] text-slate-600">
-                          <th className="border border-slate-200 py-2 px-4 font-normal">工程量</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">单价</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">合价</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">工程量</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">单价</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">合价</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">偏差百分比</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">工程量</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">单价</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">合价</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">偏差百分比</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">工程量</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">单价</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal">合价</th>
+                          <th className="border border-slate-200 py-2 px-4 font-normal bg-blue-50/50 whitespace-nowrap">工程量</th>
+                          <th className="border border-slate-200 py-2 px-4 font-normal bg-blue-50/50">单价</th>
+                          <th className="border border-slate-200 py-2 px-4 font-normal bg-blue-50/50">合价</th>
+                          {sortedBidderKeys.map(bidder => (
+                            <React.Fragment key={bidder}>
+                              <th className="border border-slate-200 py-2 px-4 font-normal whitespace-nowrap">工程量</th>
+                              <th className="border border-slate-200 py-2 px-4 font-normal">单价</th>
+                              <th className="border border-slate-200 py-2 px-4 font-normal">合价</th>
+                              <th className="border border-slate-200 py-2 px-4 font-normal">偏差百分比</th>
+                            </React.Fragment>
+                          ))}
+                          {appliedBenchmarkSettings.type !== 'none' && (
+                            <>
+                              <th className="border border-slate-200 py-2 px-4 font-normal whitespace-nowrap">工程量</th>
+                              <th className="border border-slate-200 py-2 px-4 font-normal">单价</th>
+                              <th className="border border-slate-200 py-2 px-4 font-normal">合价</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 text-sm text-slate-600 bg-white">
@@ -1012,12 +1509,12 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                             id={`compare-row-${item.id}`}
                             className={`transition-colors ${highlightedRowId === item.id ? 'bg-amber-50/70 hover:bg-amber-100/70' : 'bg-white hover:bg-blue-50/30'}`}
                           >
-                            {selectedHeaders.includes('序号') && <td className="border border-slate-200 py-3 px-4">{index + 1}</td>}
+                            {selectedHeaders.includes('序号') && <td className="border border-slate-200 py-3 px-4 whitespace-nowrap">{index + 1}</td>}
                             {selectedHeaders.includes('项目编码') && <td className="border border-slate-200 py-3 px-4 font-mono">{item.code}</td>}
-                            {selectedHeaders.includes('名称') && <td className="border border-slate-200 py-3 px-4 text-left">{item.name}</td>}
-                            {selectedHeaders.includes('项目特征') && <td className="border border-slate-200 py-3 px-4 text-left">{item.feature}</td>}
-                            {selectedHeaders.includes('单位') && <td className="border border-slate-200 py-3 px-4">{item.unit}</td>}
-                            {selectedHeaders.includes('工程量') && <td className="border border-slate-200 py-3 px-4 font-mono text-right">{item.quantity}</td>}
+                            {selectedHeaders.includes('名称') && <td className="border border-slate-200 py-3 px-4 text-left whitespace-nowrap">{item.name}</td>}
+                            {selectedHeaders.includes('项目特征') && <td className="border border-slate-200 py-3 px-4 text-left whitespace-nowrap">{item.feature}</td>}
+                            {selectedHeaders.includes('单位') && <td className="border border-slate-200 py-3 px-4 whitespace-nowrap">{item.unit}</td>}
+                            {selectedHeaders.includes('工程量') && <td className="border border-slate-200 py-3 px-4 font-mono text-right whitespace-nowrap">{item.quantity}</td>}
                             {selectedHeaders.includes('单价') && <td className="border border-slate-200 py-3 px-4 font-mono text-right">-</td>}
                             {selectedHeaders.includes('合价') && <td className="border border-slate-200 py-3 px-4 font-mono text-right">-</td>}
                             {selectedHeaders.includes('综合单价') && <td className="border border-slate-200 py-3 px-4 font-mono text-right">-</td>}
@@ -1034,10 +1531,10 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                               </button>
                             </td>
                             <td className="border border-slate-200 py-3 px-4 font-mono text-right">{(item.quantity * item.controlPrice).toFixed(2)}</td>
-                            {[bidder1, bidder2].map((bidder) => {
-                              const price = item.bidders[bidder];
+                            {sortedBidderKeys.map((bidder) => {
+                              const price = item.bidders[bidder as keyof typeof item.bidders] as number;
                               const diffPercent = ((price - item.controlPrice) / item.controlPrice) * 100;
-                              const diffClass = diffPercent >= 0 ? 'text-red-500' : 'text-blue-600';
+                              const diffClass = diffPercent >= 0 ? 'text-red-500' : 'text-green-500';
                               return (
                                 <React.Fragment key={bidder}>
                                   <td className="border border-slate-200 py-3 px-4 bg-blue-50/30 font-mono text-right">{item.quantity}</td>
@@ -1063,19 +1560,26 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                                 </React.Fragment>
                               );
                             })}
-                            <td className="border border-slate-200 py-3 px-4 bg-blue-50/30 font-mono text-right">{item.quantity}</td>
-                            <td className="border border-slate-200 py-3 px-4 font-mono text-right">
-                              <button
-                                type="button"
-                                onClick={(e) => openCompareDrawer('price', item, benchmarkBidder, item.bidders[benchmarkBidder], e)}
-                                className="w-full text-right hover:underline text-blue-600"
-                              >
-                                {item.bidders[benchmarkBidder].toFixed(2)}
-                              </button>
-                            </td>
-                            <td className="border border-slate-200 py-3 px-4 font-mono text-right">
-                              {(item.quantity * item.bidders[benchmarkBidder]).toFixed(2)}
-                            </td>
+                            {appliedBenchmarkSettings.type !== 'none' && (() => {
+                              const benchmarkCalculatedPrice = getCalculatedBenchmarkPrice(item.bidders as Record<string, number>);
+                              return (
+                                <>
+                                  <td className="border border-slate-200 py-3 px-4 bg-blue-50/30 font-mono text-right">{item.quantity}</td>
+                                  <td className="border border-slate-200 py-3 px-4 font-mono text-right">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => openCompareDrawer('price', item, appliedBenchmarkSettings.type === 'average' ? '评标平均价' : '评标基准价', benchmarkCalculatedPrice, e)}
+                                      className="w-full text-right hover:underline text-blue-600"
+                                    >
+                                      {benchmarkCalculatedPrice.toFixed(2)}
+                                    </button>
+                                  </td>
+                                  <td className="border border-slate-200 py-3 px-4 font-mono text-right">
+                                    {(item.quantity * benchmarkCalculatedPrice).toFixed(2)}
+                                  </td>
+                                </>
+                              );
+                            })()}
                           </tr>
                         ))}
                       </tbody>
@@ -1085,19 +1589,6 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
               )}
               {activeTab === 'unitCompare' && (
                 <div className="space-y-4">
-                  {/* 顶部操作区 */}
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                    <div className="text-sm text-slate-500">
-                      各投标单位及标底的单方造价对比分析，可手动修改建筑面积重新计算单方造价
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <button className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
-                        <Icon name="Download" size={14} />
-                        <span>导出报表</span>
-                      </button>
-                    </div>
-                  </div>
-                  
                   {/* 对比表格 */}
                   <div className="overflow-x-auto">
                     <table className="w-full text-center border-collapse border border-slate-200 min-w-[1200px]">
@@ -1106,18 +1597,31 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                           <th className="border border-slate-200 py-3 px-2 w-16" rowSpan={2}>序号</th>
                           <th className="border border-slate-200 py-3 px-4 min-w-[200px]" rowSpan={2}>项目名称</th>
                           <th className="border border-slate-200 py-3 px-4 w-32" rowSpan={2}>建筑面积<br/>(m2)</th>
-                          <th className="border border-slate-200 py-2 px-4" colSpan={2}>标底</th>
-                          {Object.keys(unitCompareData[0]?.bidders || {}).map(bidder => (
-                            <th key={bidder} className="border border-slate-200 py-2 px-4" colSpan={2}>{bidder}</th>
+                          <th className="border border-slate-200 py-2 px-4 bg-blue-50 text-blue-700" colSpan={2}>标底</th>
+                          {sortedBidderKeys.map(bidder => (
+                            <th 
+                              key={bidder} 
+                              className="border border-slate-200 py-2 px-4 cursor-grab active:cursor-grabbing hover:bg-slate-100 transition-colors group relative" 
+                              colSpan={2}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, bidder)}
+                              onDragOver={handleDragOver}
+                              onDrop={(e) => handleDrop(e, bidder)}
+                            >
+                              <div className="flex items-center justify-center space-x-2">
+                                {renderBidderLabel(bidder)}
+                                <Icon name="GripVertical" size={14} className="text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2" />
+                              </div>
+                            </th>
                           ))}
                         </tr>
                         <tr className="bg-slate-50 text-[12px] text-slate-600 font-medium">
-                          <th className="border border-slate-200 py-2 px-4 font-normal">不含税金额<br/>(元)</th>
-                          <th className="border border-slate-200 py-2 px-4 font-normal text-emerald-600">单方<br/>(元/㎡)</th>
-                          {Object.keys(unitCompareData[0]?.bidders || {}).map(bidder => (
+                          <th className="border border-slate-200 py-2 px-4 font-normal bg-blue-50/50">不含税金额<br/>(元)</th>
+                          <th className="border border-slate-200 py-2 px-4 font-normal text-blue-700 bg-blue-50/50">单方<br/>(元/㎡)</th>
+                          {sortedBidderKeys.map(bidder => (
                             <React.Fragment key={bidder}>
-                              <th className="border border-slate-200 py-2 px-4 font-normal">不含税金额<br/>(元)</th>
-                              <th className="border border-slate-200 py-2 px-4 font-normal text-blue-700">单方<br/>(元/㎡)</th>
+                              <th className="border border-slate-200 py-2 px-4 font-normal bg-emerald-50/50">不含税金额<br/>(元)</th>
+                              <th className="border border-slate-200 py-2 px-4 font-normal text-emerald-600 bg-emerald-50/50">单方<br/>(元/㎡)</th>
                             </React.Fragment>
                           ))}
                         </tr>
@@ -1141,21 +1645,24 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                               )}
                             </td>
                             <td className="border border-slate-200 py-2 px-4 font-mono text-right">{item.standard.toFixed(2)}</td>
-                            <td className="border border-slate-200 py-2 px-4 font-mono text-right text-emerald-600 font-medium bg-emerald-50/30">
+                            <td className="border border-slate-200 py-2 px-4 font-mono text-right text-blue-600 font-medium bg-blue-50/30">
                               {item.index === '四' 
                                 ? getCalculatedTotalUnitCost(true)
                                 : (item.area > 0 ? (item.standard / item.area).toFixed(2) : '-')}
                             </td>
-                            {(Object.entries(item.bidders) as Array<[string, number]>).map(([bidder, amount]) => (
-                              <React.Fragment key={bidder}>
-                                <td className="border border-slate-200 py-2 px-4 font-mono text-right">{amount.toFixed(2)}</td>
-                                <td className="border border-slate-200 py-2 px-4 font-mono text-right text-blue-600 font-medium bg-blue-50/30">
-                                  {item.index === '四'
-                                    ? getCalculatedTotalUnitCost(false, bidder)
-                                    : (item.area > 0 ? (amount / item.area).toFixed(2) : '-')}
-                                </td>
-                              </React.Fragment>
-                            ))}
+                            {sortedBidderKeys.map(bidder => {
+                              const amount = item.bidders[bidder as keyof typeof item.bidders] as number;
+                              return (
+                                <React.Fragment key={bidder}>
+                                  <td className="border border-slate-200 py-2 px-4 font-mono text-right">{amount.toFixed(2)}</td>
+                                  <td className="border border-slate-200 py-2 px-4 font-mono text-right text-emerald-600 font-medium bg-emerald-50/30">
+                                    {item.index === '四'
+                                      ? getCalculatedTotalUnitCost(false, bidder)
+                                      : (item.area > 0 ? (amount / item.area).toFixed(2) : '-')}
+                                  </td>
+                                </React.Fragment>
+                              );
+                            })}
                           </tr>
                         ))}
                       </tbody>
@@ -1163,7 +1670,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                   </div>
                 </div>
               )}
-              {activeTab !== 'summary' && activeTab !== 'compliance' && activeTab !== 'unbalanced' && activeTab !== 'compare' && activeTab !== 'unitCompare' && activeTab !== 'arithmetic' && activeTab !== 'collusion' && (
+              {activeTab !== 'summary' && activeTab !== 'compliance' && activeTab !== 'unbalanced' && activeTab !== 'compare' && activeTab !== 'unitCompare' && activeTab !== 'arithmetic' && activeTab !== 'collusion' && activeTab !== 'summaryCompare' && (
                 <div className="py-12 text-center text-slate-500 text-sm border border-slate-200 rounded">
                   {TABS.find(t => t.id === activeTab)?.label} 详细数据加载中...
                 </div>
@@ -1209,15 +1716,21 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
               <table className="w-full text-center border-collapse border border-slate-200 bg-white">
                 <thead className="bg-slate-50 text-[13px] text-slate-700 font-semibold sticky top-0 shadow-sm z-10">
                   <tr>
+                    <th className="border border-slate-200 py-3 px-3 w-16">序号</th>
                     <th className="border border-slate-200 py-3 px-3 w-32">费用名称</th>
                     {problemDetailDrawer.samePriceBidders?.map(bidder => (
                       <th key={bidder} className="border border-slate-200 py-3 px-3 w-48 text-right pr-14">{bidder}</th>
                     ))}
+                    {/* 单价明细对比新增差额列表头 */}
+                    {problemDetailDrawer.samePriceBidders && problemDetailDrawer.samePriceBidders.length === 2 && (
+                      <th className="border border-slate-200 py-3 px-3 w-32 text-right pr-14">差额</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {priceBreakdownRows.map((row, idx) => (
                     <tr key={idx} className="hover:bg-blue-50/30 transition-colors bg-white">
+                      <td className="border border-slate-200 py-2 px-3 text-slate-600">{idx + 1}</td>
                       <td className="border border-slate-200 py-2 px-3 text-slate-600">{row.label}</td>
                       {problemDetailDrawer.samePriceBidders?.map(bidder => {
                         const actualBidderPrice = problemDetailDrawer.selectedItem?.bidders?.[bidder] || 0;
@@ -1232,9 +1745,29 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                           </td>
                         );
                       })}
+                      {/* 单价明细对比新增差额列内容 */}
+                      {problemDetailDrawer.samePriceBidders && problemDetailDrawer.samePriceBidders.length === 2 && (
+                        <td className="border border-slate-200 py-2 px-3">
+                          <div className="flex items-center justify-end space-x-2">
+                            {(() => {
+                              const b1 = problemDetailDrawer.samePriceBidders[0];
+                              const b2 = problemDetailDrawer.samePriceBidders[1];
+                              const p1 = problemDetailDrawer.selectedItem?.bidders?.[b1] || 0;
+                              const p2 = problemDetailDrawer.selectedItem?.bidders?.[b2] || 0;
+                              const diff = (p1 * row.ratio) - (p2 * row.ratio);
+                              return (
+                                <span className={`font-mono ${diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-slate-600'}`}>
+                                  {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))}
                   <tr className="bg-slate-50 font-medium text-slate-800">
+                    <td className="border border-slate-200 py-3 px-3 whitespace-nowrap text-center">-</td>
                     <td className="border border-slate-200 py-3 px-3 whitespace-nowrap">综合单价</td>
                     {problemDetailDrawer.samePriceBidders?.map(bidder => {
                        const finalPrice = problemDetailDrawer.selectedItem?.bidders?.[bidder] || 0;
@@ -1244,6 +1777,23 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                          </td>
                        )
                     })}
+                    {/* 单价明细对比新增差额列汇总 */}
+                    {problemDetailDrawer.samePriceBidders && problemDetailDrawer.samePriceBidders.length === 2 && (
+                      <td className="border border-slate-200 py-3 px-3 text-right font-mono pr-14">
+                        {(() => {
+                          const b1 = problemDetailDrawer.samePriceBidders[0];
+                          const b2 = problemDetailDrawer.samePriceBidders[1];
+                          const p1 = problemDetailDrawer.selectedItem?.bidders?.[b1] || 0;
+                          const p2 = problemDetailDrawer.selectedItem?.bidders?.[b2] || 0;
+                          const diff = p1 - p2;
+                          return (
+                            <span className={diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-slate-600'}>
+                              {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                    )}
                   </tr>
                 </tbody>
               </table>
@@ -1275,21 +1825,27 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                     )}
                     
                     {problemDetailDrawer.type === 'samePrice' && problemDetailDrawer.samePriceBidders?.map(bidder => (
-                      <th key={bidder} className="border border-slate-200 py-2 px-4 w-32 bg-slate-50 text-slate-700">{bidder}</th>
+                      <th key={bidder} className="border border-slate-200 py-2 px-4 w-32 bg-slate-50 text-slate-700">{renderBidderLabel(bidder)}</th>
                     ))}
+
+                    {/* 单价相同相似检查，新增一列差额列（当仅有两家单位对比时） */}
+                    {problemDetailDrawer.type === 'samePrice' && problemDetailDrawer.samePriceBidders && problemDetailDrawer.samePriceBidders.length === 2 && (
+                       <>
+                         <th className="border border-slate-200 py-2 px-4 w-24 bg-slate-50 text-slate-700" rowSpan={2}>差额</th>
+                         <th className="border border-slate-200 py-2 px-4 w-24 bg-slate-50 text-slate-700" rowSpan={2}>偏差百分比</th>
+                       </>
+                    )}
                     
                     {problemDetailDrawer.type === 'unbalanced' && (
                       <th className="border border-slate-200 py-2 px-4 w-32 bg-slate-50 text-slate-700">{problemDetailDrawer.bidder}</th>
                     )}
-
-                    {/* 如果是规律性错误检查，新增一列差额列 */}
-                    {problemDetailDrawer.isRegularError && problemDetailDrawer.samePriceBidders && problemDetailDrawer.samePriceBidders.length === 2 && (
-                       <th className="border border-slate-200 py-2 px-4 w-24 bg-slate-50 text-slate-700" rowSpan={2}>差额</th>
-                    )}
                     
                     {/* 不平衡报价检查偏差列 */}
                     {problemDetailDrawer.type === 'unbalanced' && (
-                      <th className="border border-slate-200 py-2 px-4 w-24 bg-slate-50 text-slate-700 whitespace-nowrap">偏差百分比</th>
+                      <th className="border border-slate-200 py-2 px-4 w-24 bg-slate-50 text-slate-700 whitespace-nowrap" rowSpan={2}>差额</th>
+                    )}
+                    {problemDetailDrawer.type === 'unbalanced' && (
+                      <th className="border border-slate-200 py-2 px-4 w-24 bg-slate-50 text-slate-700 whitespace-nowrap" rowSpan={2}>偏差百分比</th>
                     )}
                   </tr>
                   <tr className="bg-slate-50 text-[12px] text-slate-600">
@@ -1304,10 +1860,6 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                     
                     {problemDetailDrawer.type === 'unbalanced' && (
                       <th className="border border-slate-200 py-2 px-4 font-normal whitespace-nowrap">单价</th>
-                    )}
-                    
-                    {problemDetailDrawer.type === 'unbalanced' && (
-                      <th className="border border-slate-200 py-2 px-4 font-normal whitespace-nowrap">单价偏差</th>
                     )}
                   </tr>
                 </thead>
@@ -1358,11 +1910,11 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                     const unbalancedDiffPercent = ((unbalancedBidderPrice - basePrice) / basePrice) * 100;
                     const floatRange = parseFloat(unbalancedSettings.floatRange) || 15;
                     const isExceeding = Math.abs(unbalancedDiffPercent) > floatRange;
-                    const diffClass = unbalancedDiffPercent >= 0 ? 'text-red-500' : 'text-blue-600';
+                    const diffClass = unbalancedDiffPercent >= 0 ? 'text-red-500' : 'text-green-500';
 
                     return (
                     <tr key={idx} className={`hover:bg-blue-50/30 transition-colors ${problemDetailDrawer.type === 'unbalanced' && isExceeding ? 'bg-red-50/20' : ''}`}>
-                      {selectedHeaders.includes('序号') && <td className="border border-slate-200 py-3 px-4 text-slate-500">{idx + 1}</td>}
+                      {selectedHeaders.includes('序号') && <td className="border border-slate-200 py-3 px-4 text-slate-500">1-{idx + 1}</td>}
                       {selectedHeaders.includes('项目编码') && <td className="border border-slate-200 py-3 px-4 text-slate-500 font-mono">{displayItem.code}</td>}
                       {selectedHeaders.includes('名称') && <td className="border border-slate-200 py-3 px-4 text-left font-medium text-slate-800">{displayItem.name}</td>}
                       {selectedHeaders.includes('项目特征') && <td className="border border-slate-200 py-3 px-4 text-left text-slate-600 text-xs leading-relaxed">{displayItem.feature}</td>}
@@ -1374,48 +1926,76 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                       {selectedHeaders.includes('暂估价') && <td className="border border-slate-200 py-3 px-4 font-mono text-right">-</td>}
                       {selectedHeaders.includes('备注') && <td className="border border-slate-200 py-3 px-4 text-left">-</td>}
                       
-                      {/* 单价相同相似检查隐藏标底数据列，其他检查展示 */}
                       {problemDetailDrawer.type !== 'samePrice' && (
                         <td className="border border-slate-200 py-3 px-4 font-mono text-slate-500">
-                          {problemDetailDrawer.type === 'unbalanced' ? (
-                            basePrice.toFixed(2)
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                setCurrentStep(3);
-                                setActiveTab('compare');
-                                closeProblemDetailDrawer();
-                                openCompareDrawer('price', displayItem, '标底', basePrice, e, problemDetailDrawer.samePriceBidders);
-                              }}
-                              className="w-full text-right hover:underline text-blue-600"
-                            >
-                              {basePrice.toFixed(2)}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              setCurrentStep(3);
+                              setActiveTab('compare');
+                              closeProblemDetailDrawer();
+                              openCompareDrawer('price', displayItem, '标底', basePrice, e, problemDetailDrawer.samePriceBidders);
+                            }}
+                            className="w-full text-right hover:underline text-blue-600"
+                          >
+                            {basePrice.toFixed(2)}
+                          </button>
                         </td>
                       )}
                       
-                      {problemDetailDrawer.type === 'samePrice' && problemDetailDrawer.samePriceBidders?.map(bidder => {
+                      {problemDetailDrawer.type === 'samePrice' && problemDetailDrawer.samePriceBidders?.map((bidder, bIdx, arr) => {
                         const price = (displayItem.bidders as Record<string, number>)[bidder] || displayItem.controlPrice;
                         return (
-                          <td key={bidder} className="border border-slate-200 py-3 px-4 font-mono text-red-500 font-medium">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                setProblemDetailDrawer(prev => ({
-                                  ...prev,
-                                  view: 'breakdown',
-                                  selectedItem: displayItem
-                                }));
-                              }}
-                              className="w-full text-right hover:underline text-blue-600"
-                            >
-                              {price.toFixed(2)}
-                            </button>
-                          </td>
+                          <React.Fragment key={bidder}>
+                            <td className="border border-slate-200 py-3 px-4 font-mono text-red-500 font-medium">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  setProblemDetailDrawer(prev => ({
+                                    ...prev,
+                                    view: 'breakdown',
+                                    selectedItem: displayItem
+                                  }));
+                                }}
+                                className="w-full text-right hover:underline text-blue-600"
+                              >
+                                {price.toFixed(2)}
+                              </button>
+                            </td>
+                          </React.Fragment>
                         );
                       })}
+                      
+                      {/* 单价相同相似检查：差额列及偏差百分比列 */}
+                      {problemDetailDrawer.type === 'samePrice' && problemDetailDrawer.samePriceBidders && problemDetailDrawer.samePriceBidders.length === 2 && (
+                         <>
+                           <td className="border border-slate-200 py-3 px-4 font-mono font-medium">
+                             {(() => {
+                               const p1 = (displayItem.bidders as Record<string, number>)[problemDetailDrawer.samePriceBidders[0]] || 0;
+                               const p2 = (displayItem.bidders as Record<string, number>)[problemDetailDrawer.samePriceBidders[1]] || 0;
+                               const diff = p1 - p2;
+                               return (
+                                 <span className={diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-slate-600'}>
+                                   {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                                 </span>
+                               );
+                             })()}
+                           </td>
+                           <td className="border border-slate-200 py-3 px-4 font-mono font-medium">
+                             {(() => {
+                               const p1 = (displayItem.bidders as Record<string, number>)[problemDetailDrawer.samePriceBidders[0]] || displayItem.controlPrice;
+                               const p2 = (displayItem.bidders as Record<string, number>)[problemDetailDrawer.samePriceBidders[1]] || displayItem.controlPrice;
+                               const diffPercent = (((p2 - p1) / p1) * 100);
+                               const diffClass = diffPercent > 0 ? 'text-red-500' : diffPercent < 0 ? 'text-green-500' : 'text-slate-600';
+                               return (
+                                 <span className={`w-full text-right ${diffClass}`}>
+                                   {diffPercent > 0 ? '+' : ''}{diffPercent.toFixed(2)}%
+                                 </span>
+                               );
+                             })()}
+                           </td>
+                         </>
+                      )}
                       
                       {problemDetailDrawer.type === 'unbalanced' && (
                         <td className="border border-slate-200 py-3 px-4 font-mono font-medium">
@@ -1425,11 +2005,16 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         </td>
                       )}
 
-                      {problemDetailDrawer.isRegularError && problemDetailDrawer.samePriceBidders && problemDetailDrawer.samePriceBidders.length === 2 && (
-                         <td className="border border-slate-200 py-3 px-4 font-mono text-red-500 font-medium bg-red-100/50">
-                           {((displayItem.bidders as Record<string, number>)[problemDetailDrawer.samePriceBidders[0]] - (displayItem.bidders as Record<string, number>)[problemDetailDrawer.samePriceBidders[1]]).toFixed(2)}
-                         </td>
-                      )}
+                      {/* 不平衡报价检查：差额列 */}
+                    {problemDetailDrawer.type === 'unbalanced' && (
+                      <td className="border border-slate-200 py-3 px-4 font-mono font-medium">
+                        <span className={unbalancedBidderPrice - basePrice > 0 ? 'text-red-500' : unbalancedBidderPrice - basePrice < 0 ? 'text-green-500' : 'text-slate-600'}>
+                          {unbalancedBidderPrice - basePrice > 0 ? '+' : ''}{(unbalancedBidderPrice - basePrice).toFixed(2)}
+                        </span>
+                      </td>
+                    )}
+
+                      {/* 规律性错误检查中原来的红色差额列，将其移除，因为我们已经统一添加了差额列 */}
                       
                       {problemDetailDrawer.type === 'unbalanced' && (
                         <td className={`border border-slate-200 py-3 px-4 font-mono font-medium ${diffClass} ${isExceeding ? 'bg-red-50' : ''}`}>
@@ -1489,22 +2074,57 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
         </div>
       )}
 
-      {/* 抽屉：单价明细 / 偏差原因分析 */}
+      {/* 抽屉：单价明细 / 偏差明细 */}
       {compareDrawerData.visible && (
         <div id="bottom-drawer" className="absolute inset-x-0 bottom-0 z-[190] bg-white rounded-t-2xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-slate-200 max-h-[70vh] flex flex-col animate-in slide-in-from-bottom-full duration-300">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
             <div className="min-w-0">
               <h3 className="text-base font-bold text-slate-800">
-                {compareDrawerData.view === 'price' ? '单价明细' : '偏差原因分析'}
+                {compareDrawerData.view === 'price' ? '单价明细' : '偏差明细'}
               </h3>
-              <p className="text-xs text-slate-500 mt-1 truncate">
-                {compareDrawerData.itemCode} / {compareDrawerData.itemName} / {compareDrawerData.bidder}
+              <p className="text-xs text-slate-500 mt-1 flex items-center space-x-1 truncate">
+                <span>{compareDrawerData.itemCode} / {compareDrawerData.itemName} /</span>
+                {renderBidderLabel(compareDrawerData.bidder)}
               </p>
             </div>
             <button onClick={closeCompareDrawer} className="text-slate-400 hover:text-slate-600 transition-colors">
               <Icon name="X" size={18} />
             </button>
           </div>
+          
+          {compareDrawerData.view === 'deviation' && (
+            <div className="px-6 pt-3 border-b border-slate-200 shrink-0 bg-slate-50/50">
+              <div className="flex space-x-6">
+                <button
+                  onClick={() => setCompareDrawerData(prev => ({ ...prev, activeTab: 'data' }))}
+                  className={`pb-3 text-sm font-medium transition-colors relative ${
+                    compareDrawerData.activeTab === 'data' 
+                      ? 'text-blue-600' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  数据明细
+                  {compareDrawerData.activeTab === 'data' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setCompareDrawerData(prev => ({ ...prev, activeTab: 'reason' }))}
+                  className={`pb-3 text-sm font-medium transition-colors relative ${
+                    compareDrawerData.activeTab === 'reason' 
+                      ? 'text-blue-600' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  原因分析
+                  {compareDrawerData.activeTab === 'reason' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-t-full" />
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="p-6 overflow-auto flex-1">
             {compareDrawerData.view === 'price' ? (
               <div className="space-y-4 w-full overflow-x-auto">
@@ -1515,8 +2135,14 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                       <th className="border border-slate-200 py-2 px-3 whitespace-nowrap bg-slate-50">标底</th>
                       {/* 这里假设默认展示3家投标单位的数据对比，如果没有传入则默认用所有单位名 */}
                       {(compareDrawerData.samePriceBidders || compareBidderKeys.slice(0, 3)).map(bidder => (
-                        <th key={bidder} className="border border-slate-200 py-2 px-3 whitespace-nowrap bg-slate-50">{bidder}</th>
+                        <th key={bidder} className="border border-slate-200 py-2 px-3 whitespace-nowrap bg-slate-50">
+                          {renderBidderLabel(bidder)}
+                        </th>
                       ))}
+                      {/* 如果正好是比较两家单位，新增一列差额列 */}
+                      {compareDrawerData.samePriceBidders && compareDrawerData.samePriceBidders.length === 2 && (
+                        <th className="border border-slate-200 py-2 px-3 whitespace-nowrap bg-slate-50 text-slate-700">差额</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="text-sm text-slate-600">
@@ -1545,6 +2171,23 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                             </td>
                           );
                         })}
+                        {/* 差额列渲染数据 */}
+                        {compareDrawerData.samePriceBidders && compareDrawerData.samePriceBidders.length === 2 && (
+                          <td className="border border-slate-200 py-2 px-3 text-right">
+                            {(() => {
+                              const b1 = compareDrawerData.samePriceBidders[0];
+                              const b2 = compareDrawerData.samePriceBidders[1];
+                              const p1 = compareDrawerData.biddersPrices?.[b1] ?? (compareDrawerData.bidderPrice * (1 + (Math.random() * 0.1 - 0.05)));
+                              const p2 = compareDrawerData.biddersPrices?.[b2] ?? (compareDrawerData.bidderPrice * (1 + (Math.random() * 0.1 - 0.05)));
+                              const diff = (p1 * row.ratio) - (p2 * row.ratio);
+                              return (
+                                <span className={`font-mono ${diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-slate-600'}`}>
+                                  {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                        )}
                       </tr>
                     ))}
                     <tr className="bg-slate-50 font-medium text-slate-800">
@@ -1558,34 +2201,121 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                            </td>
                          )
                       })}
+                      {/* 差额列综合单价汇总 */}
+                      {compareDrawerData.samePriceBidders && compareDrawerData.samePriceBidders.length === 2 && (
+                         <td className="border border-slate-200 py-3 px-3 text-right font-mono">
+                           {(() => {
+                              const b1 = compareDrawerData.samePriceBidders[0];
+                              const b2 = compareDrawerData.samePriceBidders[1];
+                              const final1 = compareDrawerData.biddersPrices?.[b1] ?? compareDrawerData.bidderPrice;
+                              const final2 = compareDrawerData.biddersPrices?.[b2] ?? compareDrawerData.bidderPrice;
+                              const diff = final1 - final2;
+                              return (
+                                <span className={diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-slate-600'}>
+                                  {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                                </span>
+                              );
+                           })()}
+                         </td>
+                      )}
                     </tr>
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="space-y-4 text-sm">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/60">
-                    <div className="text-slate-500 text-xs">控制价</div>
-                    <div className="font-mono text-slate-800 mt-1">{compareDrawerData.controlPrice.toFixed(2)}</div>
+              <div className="space-y-4 text-sm w-full overflow-x-auto">
+                {compareDrawerData.activeTab === 'data' ? (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-center border-collapse">
+                      <thead className="bg-slate-50 text-[13px] text-slate-700 font-semibold">
+                        <tr>
+                          <th className="border-b border-slate-200 py-3 px-4 w-32 bg-slate-50">费用构成</th>
+                          <th className="border-b border-slate-200 py-3 px-4 bg-slate-50">
+                            {unbalancedSettings.quoteType === 'controlPrice' ? '控制价' : 
+                             unbalancedSettings.quoteType === 'bidAvg' ? '投标均价' : 
+                             unbalancedSettings.quoteType === 'bidLowest' ? '投标最低价' : '去极值均价'}
+                          </th>
+                          <th className="border-b border-slate-200 py-3 px-4 bg-slate-50">
+                            {renderBidderLabel(compareDrawerData.bidder)}
+                          </th>
+                          <th className="border-b border-slate-200 py-3 px-4 bg-slate-50">差价</th>
+                          <th className="border-b border-slate-200 py-3 px-4 bg-slate-50">差价百分比</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-sm">
+                        {priceBreakdownRows.map((row) => {
+                          const basePriceValue = compareDrawerData.controlPrice * row.ratio;
+                          const bidderPriceValue = compareDrawerData.bidderPrice * row.ratio;
+                          const diff = bidderPriceValue - basePriceValue;
+                          const diffPercent = basePriceValue > 0 ? (diff / basePriceValue) * 100 : 0;
+                          
+                          return (
+                            <tr key={row.label} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-3 px-4 font-medium text-slate-700">{row.label}</td>
+                              <td className="py-3 px-4 font-mono text-slate-600">{basePriceValue.toFixed(2)}</td>
+                              <td className="py-3 px-4 font-mono text-slate-800">{bidderPriceValue.toFixed(2)}</td>
+                              <td className={`py-3 px-4 font-mono ${diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-slate-600'}`}>
+                                {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                              </td>
+                              <td className={`py-3 px-4 font-mono ${diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-slate-600'}`}>
+                                {diff > 0 ? '+' : ''}{diffPercent.toFixed(2)}%
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="bg-slate-50 font-medium text-slate-800">
+                          <td className="py-3 px-4">综合单价</td>
+                          <td className="py-3 px-4 font-mono text-slate-600">{compareDrawerData.controlPrice.toFixed(2)}</td>
+                          <td className="py-3 px-4 font-mono">{compareDrawerData.bidderPrice.toFixed(2)}</td>
+                          <td className={`py-3 px-4 font-mono ${compareDrawerData.bidderPrice - compareDrawerData.controlPrice > 0 ? 'text-red-500' : compareDrawerData.bidderPrice - compareDrawerData.controlPrice < 0 ? 'text-green-500' : 'text-slate-600'}`}>
+                            {compareDrawerData.bidderPrice - compareDrawerData.controlPrice > 0 ? '+' : ''}{(compareDrawerData.bidderPrice - compareDrawerData.controlPrice).toFixed(2)}
+                          </td>
+                          <td className={`py-3 px-4 font-mono ${compareDrawerData.diffPercent > 0 ? 'text-red-500' : compareDrawerData.diffPercent < 0 ? 'text-green-500' : 'text-slate-600'}`}>
+                            {compareDrawerData.diffPercent > 0 ? '+' : ''}{compareDrawerData.diffPercent.toFixed(2)}%
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                  <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/60">
-                    <div className="text-slate-500 text-xs">投标单价</div>
-                    <div className="font-mono text-slate-800 mt-1">{compareDrawerData.bidderPrice.toFixed(2)}</div>
-                  </div>
-                  <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/60">
-                    <div className="text-slate-500 text-xs">偏差百分比</div>
-                    <div className={`font-mono mt-1 ${compareDrawerData.diffPercent >= 0 ? 'text-red-500' : 'text-blue-600'}`}>
-                      {compareDrawerData.diffPercent >= 0 ? '+' : ''}{compareDrawerData.diffPercent.toFixed(1)}%
+                ) : (
+                  <div className="space-y-2 relative">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="font-medium text-slate-800">AI 分析结果</div>
+                      {aiReasonAnalysisStatus === 'idle' || aiReasonAnalysisStatus === 'analyzing' ? (
+                        <button 
+                          onClick={() => handleStartAiReasonAnalysis(false)}
+                          className="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors shadow-sm flex items-center space-x-1"
+                        >
+                          <Icon name="Sparkles" size={12} />
+                          <span>AI分析</span>
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => handleStartAiReasonAnalysis(true)}
+                          className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors shadow-sm flex items-center space-x-1"
+                        >
+                          <Icon name="RefreshCw" size={12} />
+                          <span>重新分析</span>
+                        </button>
+                      )}
                     </div>
+                    
+                    {aiReasonAnalysisStatus === 'done' ? (
+                      <div className="space-y-3 bg-slate-50/50 p-4 rounded border border-slate-100 text-slate-700 leading-relaxed text-sm">
+                        <p><strong>1. 主要材料价格差异：</strong>当前投标单位在“钢筋”和“商品混凝土”等主材上的报价，相较于基准价偏低约 8%，这是导致综合单价产生负偏差的核心原因。</p>
+                        <p><strong>2. 措施费与管理费策略：</strong>该单位的企业管理费率设定为 3.5%，低于基准均值（约5%），体现了其在本次投标中采取了较为激进的价格竞争策略。</p>
+                        <p><strong>3. 潜在风险提示：</strong>单价大幅下浮可能存在“不平衡报价”中“前轻后重”的策略，或者后期施工过程中的材料质量降级风险。建议在清标报告中重点标记，并在讲标环节要求施工方提供主材供应商的承诺函或价格证明。</p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center py-12 bg-slate-50/50 rounded border border-slate-100 border-dashed text-slate-400">
+                        <div className="flex flex-col items-center space-y-3">
+                          <Icon name="Bot" size={32} className="text-slate-300" />
+                          <span className="text-sm">点击上方“AI分析”按钮获取智能原因洞察</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="border border-slate-200 rounded-lg p-4 space-y-2">
-                  <div className="font-medium text-slate-800">原因分析</div>
-                  <div className="text-slate-600">1. 主要材料价格波动导致单价偏离基准区间。</div>
-                  <div className="text-slate-600">2. 施工组织方案差异造成人工与机械投入不同。</div>
-                  <div className="text-slate-600">3. 企业管理费率与风险计取策略存在差异。</div>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -1636,6 +2366,55 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
               </button>
               <button 
                 onClick={() => setShowHeaderSettingsModal(false)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 汇总对比表表头设置弹窗 */}
+      {showSummaryHeaderSettingsModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-lg shadow-xl w-[600px] overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h3 className="text-base font-bold text-slate-800">表头设置</h3>
+              <button onClick={() => setShowSummaryHeaderSettingsModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <Icon name="X" size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="text-sm text-slate-600 mb-6">请手动选择或确认原文件识别出来的前几列表头项。若存在识别错误、漏识别或多识别，可在此调整。</div>
+              <div className="grid grid-cols-3 gap-4">
+                {availableSummaryHeaders.map(header => (
+                  <label key={header} className="flex items-center space-x-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedSummaryHeaders.includes(header)}
+                      onChange={() => toggleSummaryHeader(header)}
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500" 
+                    />
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-sm text-slate-700">{header}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end px-6 py-4 border-t border-slate-200 bg-slate-50 space-x-3">
+              <button 
+                onClick={() => setShowSummaryHeaderSettingsModal(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+              >
+                取消
+              </button>
+              <button 
+                onClick={() => setShowSummaryHeaderSettingsModal(false)}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors shadow-sm"
               >
                 确定
@@ -1707,6 +2486,364 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
               >
                 确定
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* AI 偏差原因分析进度弹窗 */}
+      {showAiReasonAnalysisModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-[480px] p-8 flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-6">
+              <Icon name="Loader" size={32} className="text-blue-600 animate-spin" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">正在智能分析单价明细...</h3>
+            <p className="text-sm text-slate-500 mb-8 text-center leading-relaxed">
+              AI 正在提取该清单项下各费用构成的具体偏离情况<br/>请您耐心等待
+            </p>
+            
+            <div className="w-full space-y-2 mb-6">
+              <div className="flex justify-between text-xs font-medium text-slate-600">
+                <span>分析进度</span>
+                <span className="text-blue-600">{aiReasonAnalysisProgress}%</span>
+              </div>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-600 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${aiReasonAnalysisProgress}%` }}
+                />
+              </div>
+            </div>
+
+            <button 
+              onClick={handleCancelAiReasonAnalysis}
+              className="px-6 py-2 text-sm font-medium text-slate-500 bg-white border border-slate-300 rounded-full hover:bg-slate-50 hover:text-slate-700 transition-colors"
+            >
+              取消分析
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* AI整体分析弹窗 */}
+      {showAiAnalysisModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          {aiAnalysisStatus === 'analyzing' ? (
+            <div className="bg-white rounded-xl shadow-2xl w-[480px] p-8 flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-6">
+                <Icon name="Loader" size={32} className="text-blue-600 animate-spin" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-800 mb-2">全力分析中...</h3>
+              <p className="text-sm text-slate-500 mb-8 text-center leading-relaxed">
+                AI整体分析数据量较大，耗时久<br/>请您耐心等待
+              </p>
+              
+              <div className="w-full space-y-2 mb-6">
+                <div className="flex justify-between text-xs font-medium text-slate-600">
+                  <span>分析进度</span>
+                  <span className="text-blue-600">{aiAnalysisProgress}%</span>
+                </div>
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-600 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${aiAnalysisProgress}%` }}
+                  />
+                </div>
+              </div>
+
+              <button 
+                onClick={handleCancelAiAnalysis}
+                className="px-6 py-2 text-sm font-medium text-slate-500 bg-white border border-slate-300 rounded-full hover:bg-slate-50 hover:text-slate-700 transition-colors"
+              >
+                取消分析
+              </button>
+            </div>
+          ) : aiAnalysisStatus === 'done' ? (
+            <div className="bg-white rounded-xl shadow-2xl w-[800px] max-h-[85vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center space-x-2">
+                  <h3 className="text-base font-bold text-slate-800">AI 整体分析报告</h3>
+                </div>
+                <button onClick={() => setShowAiAnalysisModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-md hover:bg-slate-200">
+                  <Icon name="X" size={20} />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm text-sm text-slate-700 leading-relaxed space-y-4">
+                  <p>本次清标检查共分析了2家投标单位的报价数据，整体结论如下：</p>
+                  
+                  <p className="font-semibold text-slate-800">一、 整体偏差情况</p>
+                  <ul className="list-disc pl-5 space-y-2">
+                    <li><strong>投标单位1</strong>：综合偏差率为 <span className="text-red-500 font-medium">+4.5%</span>，整体报价高于控制价，需重点关注其高价项是否存在前期多拿工程款的意图。</li>
+                    <li><strong>投标单位2</strong>：综合偏差率为 <span className="text-green-500 font-medium">-2.1%</span>，偏离基准处于合理下浮区间。</li>
+                  </ul>
+
+                  <p className="font-semibold text-slate-800 mt-6">二、 高风险异常项说明</p>
+                  <ul className="list-decimal pl-5 space-y-3">
+                    <li>
+                      <strong>挖沟槽土方 (010101002001)</strong><br/>
+                      两家投标单位的报价均显著高于控制价（偏离度达+5.4%）。此项作为前期工程，存在典型的不平衡报价（前重后轻）特征，建议专家复核现场实际土方工程量，防范超付风险。
+                    </li>
+                    <li>
+                      <strong>回填方 (010103001001)</strong><br/>
+                      投标单位之间报价离散度较高。投标单位1单价 21.00 元，投标单位2单价 23.50 元，差异率超过 10%。可能存在对图纸理解不一致、施工方案选用差异或材料运距考量不同的情况。
+                    </li>
+                    <li>
+                      <strong>措施项目及规费</strong><br/>
+                      措施费整体下浮比例处于正常范围，但系统检测到“投标单位2”的规费计取费率与标底存在微小差异。建议在“符合性检查”环节仔细核对不可竞争费用的计取基数及费率标准。
+                    </li>
+                  </ul>
+
+                  <p className="font-semibold text-slate-800 mt-6">三、 综合建议</p>
+                  <p>建议在后续评标及商务谈判中，重点要求“投标单位1”就土方类高价项提供详细的单价分析表及组价依据；要求“投标单位2”复核不可竞争费用的合规性。</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-white">
+                <div className="text-xs text-slate-500 flex items-center space-x-1">
+                  <Icon name="Info" size={14} />
+                  <span>AI 分析结果仅供参考，最终结论请以专家复核为准</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button 
+                    onClick={() => setShowAiAnalysisModal(false)}
+                    className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                  >
+                    关闭
+                  </button>
+                  <button 
+                    onClick={() => {
+                      handleStartAiAnalysis(true);
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors shadow-sm flex items-center space-x-1"
+                  >
+                    <Icon name="RefreshCw" size={14} />
+                    <span>重新分析</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      alert('正在生成并下载 PDF 分析报告...');
+                      setShowAiAnalysisModal(false);
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors shadow-sm flex items-center space-x-1"
+                  >
+                    <Icon name="Download" size={16} />
+                    <span>下载报告</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>,
+        document.body
+      )}
+
+      {/* 评标价设置弹窗 */}
+      {showBenchmarkModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-[520px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+              <h3 className="text-base font-bold text-slate-800 flex items-center space-x-2">
+                <Icon name="Settings" size={18} className="text-blue-600" />
+                <span>评标价设置</span>
+              </h3>
+              <button onClick={() => setShowBenchmarkModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-md hover:bg-slate-200">
+                <Icon name="X" size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="flex items-center space-x-4">
+                <label className={`flex items-center space-x-2 px-4 py-2.5 rounded-md border cursor-pointer transition-colors ${tempBenchmarkSettings.type === 'none' ? 'border-blue-600 bg-blue-50/30' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  <input 
+                    type="radio" 
+                    checked={tempBenchmarkSettings.type === 'none'}
+                    onChange={() => setTempBenchmarkSettings({...tempBenchmarkSettings, type: 'none'})}
+                    className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-slate-700">不显示</span>
+                </label>
+                <label className={`flex items-center space-x-2 px-4 py-2.5 rounded-md border cursor-pointer transition-colors ${tempBenchmarkSettings.type === 'benchmark' ? 'border-blue-600 bg-blue-50/30' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  <input 
+                    type="radio" 
+                    checked={tempBenchmarkSettings.type === 'benchmark'}
+                    onChange={() => setTempBenchmarkSettings({...tempBenchmarkSettings, type: 'benchmark'})}
+                    className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-slate-700">显示基准价</span>
+                </label>
+                <label className={`flex items-center space-x-2 px-4 py-2.5 rounded-md border cursor-pointer transition-colors ${tempBenchmarkSettings.type === 'average' ? 'border-blue-600 bg-blue-50/30' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  <input 
+                    type="radio" 
+                    checked={tempBenchmarkSettings.type === 'average'}
+                    onChange={() => setTempBenchmarkSettings({...tempBenchmarkSettings, type: 'average'})}
+                    className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-slate-700">显示平均价</span>
+                </label>
+              </div>
+
+              {tempBenchmarkSettings.type === 'benchmark' && (
+                <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="text-sm font-medium text-slate-800">基准价公式</div>
+                  <select 
+                    value={tempBenchmarkSettings.formula}
+                    onChange={(e) => setTempBenchmarkSettings({...tempBenchmarkSettings, formula: e.target.value})}
+                    className="w-full h-9 px-3 text-sm border border-slate-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                  >
+                    <option value="1">公式一：算术平均法</option>
+                    <option value="2">公式二：算术平均 × 权重 B1 + 次低价 × 权重 B2（B1/B2 随机抽取）</option>
+                    <option value="3">公式三：算术平均 ×(1−C)（C 随机）</option>
+                    <option value="4">公式四：（算术平均 + 次低价）÷2</option>
+                    <option value="5">公式五：低于算术平均的报价再平均</option>
+                    <option value="6">公式六：经评审的最低有效价</option>
+                  </select>
+                </div>
+              )}
+
+              {tempBenchmarkSettings.type === 'average' && (
+                <div className="space-y-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="text-sm font-medium text-slate-800 flex justify-between">
+                    <span>参与计算的投标单位</span>
+                    <button 
+                      onClick={() => setTempBenchmarkSettings({...tempBenchmarkSettings, selectedBidders: compareBidderKeys})}
+                      className="text-blue-600 hover:text-blue-700 text-xs font-medium"
+                    >
+                      全选
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pt-2 border-t border-slate-200">
+                    {compareBidderKeys.map(bidder => (
+                      <label key={bidder} className="flex items-center space-x-2 cursor-pointer p-1.5 hover:bg-white rounded">
+                        <input 
+                          type="checkbox" 
+                          checked={tempBenchmarkSettings.selectedBidders.includes(bidder)}
+                          onChange={(e) => {
+                            const newSelected = e.target.checked 
+                              ? [...tempBenchmarkSettings.selectedBidders, bidder]
+                              : tempBenchmarkSettings.selectedBidders.filter(b => b !== bidder);
+                            setTempBenchmarkSettings({...tempBenchmarkSettings, selectedBidders: newSelected});
+                          }}
+                          className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-xs text-slate-700 truncate" title={bidder}>{bidder}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
+              <button 
+                onClick={() => setShowBenchmarkModal(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+              >
+                取消
+              </button>
+              <button 
+                onClick={() => {
+                  setAppliedBenchmarkSettings(tempBenchmarkSettings);
+                  setShowBenchmarkModal(false);
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                确认
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 导出报表弹窗 */}
+      {showExportModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl w-[480px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+              <h3 className="text-base font-bold text-slate-800 flex items-center space-x-2">
+                <Icon name="Download" size={18} className="text-blue-600" />
+                <span>导出报表</span>
+              </h3>
+              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-md hover:bg-slate-200">
+                <Icon name="X" size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="text-sm text-slate-600 mb-4">请选择需要导出的报表内容（支持多选）：</div>
+              <div className="space-y-3">
+                <label className={`flex items-center space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${exportSelection.includes('summary') ? 'border-blue-600 bg-blue-50/30' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  <input 
+                    type="checkbox" 
+                    checked={exportSelection.includes('summary')}
+                    onChange={() => toggleExportSelection('summary')}
+                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-slate-800">汇总对比表</span>
+                    <span className="text-xs text-slate-500 mt-1">包含各单位工程及总造价的对比数据</span>
+                  </div>
+                </label>
+
+                <label className={`flex items-center space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${exportSelection.includes('compare') ? 'border-blue-600 bg-blue-50/30' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  <input 
+                    type="checkbox" 
+                    checked={exportSelection.includes('compare')}
+                    onChange={() => toggleExportSelection('compare')}
+                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-slate-800">清标对比表</span>
+                    <span className="text-xs text-slate-500 mt-1">包含各专业工程的清单项详细比对</span>
+                  </div>
+                </label>
+
+                <label className={`flex items-center space-x-3 p-4 rounded-lg border cursor-pointer transition-colors ${exportSelection.includes('unit') ? 'border-blue-600 bg-blue-50/30' : 'border-slate-200 hover:bg-slate-50'}`}>
+                  <input 
+                    type="checkbox" 
+                    checked={exportSelection.includes('unit')}
+                    onChange={() => toggleExportSelection('unit')}
+                    className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500"
+                  />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-slate-800">单方对比表</span>
+                    <span className="text-xs text-slate-500 mt-1">包含建筑面积及单方造价的分析数据</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
+              <div className="text-sm text-slate-500">
+                已选择 <span className="font-bold text-blue-600">{exportSelection.length}</span> 个报表
+              </div>
+              <div className="flex space-x-3">
+                <button 
+                  onClick={() => setShowExportModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+                >
+                  取消
+                </button>
+                <button 
+                  onClick={() => {
+                    if (exportSelection.length === 0) {
+                      alert('请至少选择一个报表进行导出');
+                      return;
+                    }
+                    alert(`正在打包导出以下报表...\n${exportSelection.join(', ')}`);
+                    setShowExportModal(false);
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={exportSelection.length === 0}
+                >
+                  确认导出
+                </button>
+              </div>
             </div>
           </div>
         </div>,

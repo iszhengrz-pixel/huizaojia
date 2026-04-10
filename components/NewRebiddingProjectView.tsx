@@ -8,14 +8,16 @@ interface FileItem {
   name: string;
   size: string;
   uploadTime: string;
+  round?: string;
 }
 
 interface NewRebiddingProjectViewProps {
   onBack: () => void;
+  onReturnToList?: () => void; // 新增：直接返回到列表页
   mode?: 'new' | 'edit';
 }
 
-const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBack, mode = 'new' }) => {
+const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBack, onReturnToList, mode = 'new' }) => {
   const [projectName, setProjectName] = useState('');
   const [showResultView, setShowResultView] = useState(false);
   
@@ -168,31 +170,106 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
   const [editingFileId, setEditingFileId] = useState<string | null>(null);
   const [editingFileName, setEditingFileName] = useState('');
 
-  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  // 识别结果弹窗状态
+  const [controlRuleFile, setControlRuleFile] = useState<FileItem | null>(null); // 控制价规则配置弹窗
+  const [tenderMatchFile, setTenderMatchFile] = useState<FileItem | null>(null); // 投标文件匹配结果弹窗
+  const [activeSheetIndex, setActiveSheetIndex] = useState(6); // 默认选中 3-桩基工程 (index 6)
+  const [sheetRules, setSheetRules] = useState([
+    { col: 'B', name: '项目编码', type: 'info', notEmpty: true, isNumber: true },
+    { col: 'C', name: '项目名称', type: 'compare', notEmpty: true, isNumber: true },
+  ]);
+  const [rulePanelHeight, setRulePanelHeight] = useState(400); // 规则维护面板初始高度
+  const [isRulePanelCollapsed, setIsRulePanelCollapsed] = useState(false); // 规则维护面板是否折叠
+
+  // 处理拖拽改变高度
+  const handleDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startHeight = rulePanelHeight;
+
+    const handleDrag = (moveEvent: MouseEvent) => {
+      if (isRulePanelCollapsed) return;
+      // 鼠标向上移动，clientY变小，deltaY为负数，面板高度应该增加
+      // 鼠标向下移动，clientY变大，deltaY为正数，面板高度应该减少
+      const deltaY = moveEvent.clientY - startY; 
+      const newHeight = Math.max(150, Math.min(startHeight - deltaY, window.innerHeight * 0.8)); // 限制最小150px，最大占屏幕80%
+      setRulePanelHeight(newHeight);
+    };
+
+    const handleDragEnd = () => {
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.body.style.cursor = 'default';
+    };
+
+    document.addEventListener('mousemove', handleDrag);
+    document.addEventListener('mouseup', handleDragEnd);
+    document.body.style.cursor = 'row-resize';
+  };
+  const [recognitionList, setRecognitionList] = useState([
+    { name: '封面', rows: 5, field: '(单位盖章)', confidence: 5, isCompared: false, disabled: false },
+    { name: '目录', rows: 19, field: '', confidence: 0, isCompared: false, disabled: false },
+    { name: '编制说明', rows: 265, field: '', confidence: 0, isCompared: false, disabled: false },
+    { name: '报价汇总表', rows: 21, field: '小计', confidence: 40, isCompared: false, disabled: false },
+    { name: '1-土石方工程', rows: 15, isCompared: true, disabled: false, matched: true },
+    { name: '2-基坑支护工程', rows: 80, isCompared: true, disabled: false, matched: true },
+    { name: '3-桩基工程', rows: 46, isCompared: true, disabled: false, matched: true },
+    { name: '4-土建工程综合单价分析表', rows: 387, confidence: 95, isCompared: true, disabled: false, matched: true },
+    { name: '4.1-土建工程（地下室）', rows: 229, isCompared: true, disabled: false, matched: true },
+  ]);
   
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
-  const handleFileUpload = (type: 'bidding' | 'control' | 'tender', max: number) => {
-    let currentFiles = type === 'bidding' ? biddingFiles : type === 'control' ? controlFiles : tenderFiles;
-    if (currentFiles.length >= max) {
-      alert(`超出限制，最多只能上传 ${max} 份文件`);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (type: 'bidding' | 'control' | 'tender', max?: number) => {
+    if (type === 'bidding' && biddingFiles.length >= 1) {
+      alert('招标文件只能上传一份，如需更换请先删除现有文件。');
       return;
     }
+    if (type === 'control' && controlFiles.length >= 1) {
+      alert('控制价文件只能上传一份，如需更换请先删除现有文件。');
+      return;
+    }
+    triggerSystemUpload(type);
+  };
+
+  const triggerSystemUpload = (type: 'bidding' | 'control' | 'tender') => {
+    // 模拟打开文件选择框
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = '.xml,.zbz,.czb,.gzb,.hzb,.bxzx,.zbx,.pdf,.doc,.docx,.xls,.xlsx';
     
-    // 模拟文件上传
-    const now = new Date();
-    const timeString = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const newFile = { 
-      id: Date.now().toString(), 
-      name: `示例文件_${Date.now()}.xlsx`, 
-      size: '2.5MB',
-      uploadTime: timeString
+    input.onchange = (e) => {
+      const files = Array.from((e.target as HTMLInputElement).files || []);
+      if (files.length === 0) return;
+      
+      const newFiles = files.map(file => ({
+        id: Math.random().toString(36).substr(2, 9),
+        name: file.name,
+        size: (file.size / 1024 / 1024).toFixed(2) + ' MB',
+        uploadTime: new Date().toLocaleString(),
+        status: 'success' as const,
+        round: mode === 'new' ? '一轮回标' : '二轮回标'
+      }));
+      
+      if (type === 'bidding') {
+        setBiddingFiles([...biddingFiles, ...newFiles]);
+      } else if (type === 'control') {
+        setControlFiles([...controlFiles, ...newFiles]);
+        // 上传控制价文件后自动弹出规则配置弹窗
+        setControlRuleFile(newFiles[0]);
+      } else {
+        setTenderFiles([...tenderFiles, ...newFiles]);
+        // 上传投标文件后自动弹出匹配结果弹窗
+        setTenderMatchFile(newFiles[0]);
+      }
     };
-    if (type === 'bidding') setBiddingFiles([newFile]);
-    if (type === 'control') setControlFiles([newFile]);
-    if (type === 'tender') setTenderFiles([...tenderFiles, newFile]);
+    
+    input.click();
   };
 
   const removeFile = (type: 'bidding' | 'control' | 'tender', id: string) => {
@@ -218,10 +295,19 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
     setEditingFileId(null);
   };
 
+  const MOCK_PREVIEW_DATA = [
+    { id: 1, A: '总包工程量清单明细表——桩基工程', B: '', C: '', D: '', E: '', F: '', G: '', H: '', I: '', J: '', K: '' },
+    { id: 2, A: '序号', B: '项目编码', C: '项目名称', D: '项目特征描述', E: '计量单位', F: '工作内容', G: '部位', H: '主材编码', I: '主材名称', J: '主材规格型号', K: '主材供货方式' },
+    { id: 3, A: '', B: '', C: '', D: '', E: '', F: '', G: '', H: '', I: '', J: '', K: '' },
+    { id: 4, A: '', B: '', C: '', D: '', E: '', F: '', G: '', H: '', I: '', J: '', K: '' },
+    { id: 5, A: '一', B: '0103', C: '桩基工程', D: '', E: '', F: '', G: '', H: '', I: '', J: '', K: '' },
+    { id: 6, A: '', B: '010301', C: '预制桩(方桩)', D: '', E: '', F: '', G: '', H: '', I: '', J: '', K: '' },
+  ];
+
   const renderFileListTable = (type: 'bidding' | 'control' | 'tender', files: FileItem[]) => {
     // 计算分页数据
     const totalItems = files.length;
-    const totalPages = Math.ceil(totalItems / pageSize);
+    const totalPages = Math.ceil(totalItems / pageSize) || 1;
     
     // 如果当前页超过了总页数（例如删除了最后一页的最后一个文件），则调整当前页
     if (currentPage > totalPages && totalPages > 0) {
@@ -238,7 +324,7 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="px-4 py-2.5 text-[13px] font-semibold text-slate-800">文件名</th>
-              <th className="px-4 py-2.5 text-[13px] font-semibold text-slate-800 w-32">大小</th>
+              <th className="px-4 py-2.5 text-[13px] font-semibold text-slate-800 w-24 whitespace-nowrap">回标轮次</th>
               <th className="px-4 py-2.5 text-[13px] font-semibold text-slate-800 w-40">上传时间</th>
               <th className="px-4 py-2.5 text-[13px] font-semibold text-slate-800 w-32 text-right">操作</th>
             </tr>
@@ -263,7 +349,11 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-2.5 text-[13px] text-slate-500">{file.size}</td>
+                  <td className="px-4 py-2.5 text-[13px] text-slate-600">
+                    <span className="inline-flex px-2 py-0.5 rounded bg-blue-50 text-blue-600 font-medium whitespace-nowrap">
+                      {file.round || '-'}
+                    </span>
+                  </td>
                   <td className="px-4 py-2.5 text-[13px] text-slate-500">{file.uploadTime || '-'}</td>
                   <td className="px-4 py-2.5 text-[13px] text-right space-x-2">
                     {editingFileId === file.id ? (
@@ -273,8 +363,15 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
                       </div>
                     ) : (
                       <div className="flex justify-end space-x-3">
-                        <button onClick={() => setPreviewFile(file)} className="text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap">
-                          查看
+                        <button 
+                          onClick={() => {
+                            if (type === 'control') setControlRuleFile(file);
+                            else if (type === 'tender') setTenderMatchFile(file);
+                            else alert('预览功能开发中');
+                          }} 
+                          className="text-blue-600 hover:text-blue-700 font-medium whitespace-nowrap"
+                        >
+                          {type === 'control' ? '配置规则' : type === 'tender' ? '匹配结果' : '查看'}
                         </button>
                         <button onClick={() => removeFile(type, file.id)} className="text-red-500 hover:text-red-600 font-medium whitespace-nowrap">
                           删除
@@ -466,7 +563,7 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
   };
 
   if (showResultView) {
-    return <RebiddingCheckResultView onBack={() => setShowResultView(false)} mode={mode} />;
+    return <RebiddingCheckResultView onBack={() => setShowResultView(false)} onReturnToList={onReturnToList || onBack} mode={mode} />;
   }
 
   return (
@@ -484,40 +581,43 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
         </div>
         
         {/* 进度条区域 */}
-        <div className="flex-1 flex justify-center items-center">
-          <div className="flex items-center space-x-2">
-            {/* Step 1 */}
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</div>
-              <span className="ml-2 text-sm font-medium text-blue-600">{mode === 'new' ? '新建项目' : '编辑项目'}</span>
-            </div>
-            
-            {/* Divider */}
-            <div className="w-12 h-[1px] bg-slate-300 mx-2"></div>
-            
-            {/* Step 2 */}
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400 text-xs font-bold border border-slate-200">2</div>
-              <span className="ml-2 text-sm font-medium text-slate-500">清标检查</span>
-            </div>
-            
-            {/* Divider */}
-            <div className="w-12 h-[1px] bg-slate-300 mx-2"></div>
-            
-            {/* Step 3 */}
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400 text-xs font-bold border border-slate-200">3</div>
-              <span className="ml-2 text-sm font-medium text-slate-500">查看对比表</span>
-            </div>
+        <div className="flex-1 flex justify-center items-center px-8">
+          <div className="flex w-full max-w-3xl gap-2">
+            {[
+              { id: 1, label: mode === 'new' ? '新建项目' : '编辑项目' },
+              { id: 2, label: '清标检查' },
+              { id: 3, label: '查看对比表' },
+              { id: 4, label: '导出报告' }
+            ].map(step => {
+              const isCompleted = 1 > step.id; // 在新建项目页面，当前固定在第一步，所以后面都没完成
+              const isActive = 1 === step.id;
+              
+              const barColor = isCompleted ? 'bg-[#00C48C]' : isActive ? 'bg-blue-600' : 'bg-[#E5E6EB]';
+              const textColor = isCompleted ? 'text-[#333333] group-hover:text-green-600' : isActive ? 'text-blue-600 font-semibold' : 'text-[#999999]';
 
-            {/* Divider */}
-            <div className="w-12 h-[1px] bg-slate-300 mx-2"></div>
-            
-            {/* Step 4 */}
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400 text-xs font-bold border border-slate-200">4</div>
-              <span className="ml-2 text-sm font-medium text-slate-500">导出报告</span>
-            </div>
+              return (
+                <button 
+                  key={step.id}
+                  className="flex flex-col flex-1 text-left cursor-default group"
+                >
+                  {/* Top Bar */}
+                  <div className={`h-1 w-full rounded-full ${barColor}`}></div>
+                  {/* Content */}
+                  <div className={`flex items-center mt-2 p-1.5 rounded-md transition-colors ${isCompleted ? 'group-hover:bg-green-50' : ''}`}>
+                    {isCompleted ? (
+                      <Icon name="CheckCircle2" size={16} className="text-[#00C48C] group-hover:text-green-600 transition-colors" />
+                    ) : isActive ? (
+                      <div className="flex items-center justify-center w-4 h-4 rounded-full border-2 border-blue-600">
+                        <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                      </div>
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-[#E5E6EB]"></div>
+                    )}
+                    <span className={`ml-2 text-sm transition-colors ${textColor}`}>{step.label}</span>
+                  </div>
+                </button>
+              )
+            })}
           </div>
         </div>
 
@@ -784,79 +884,394 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
         </div>
       </div>
 
-      {/* 预览/编辑弹窗 */}
-      {previewFile && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setPreviewFile(null)}></div>
-          <div className="relative bg-white w-full h-full md:w-[90vw] md:h-[90vh] md:rounded-2xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-slate-50/50">
-              <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
-                  <Icon name="Table" size={18} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-800">{previewFile.name}</h3>
-                  <p className="text-xs text-slate-500">在线预览与编辑</p>
+      {/* 控制价规则配置弹窗 */}
+      {controlRuleFile && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white w-[95vw] h-[90vh] rounded-xl shadow-2xl flex overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* 左侧边栏：页签列表 */}
+            <div className="w-72 bg-white border-r border-slate-200 flex flex-col shrink-0">
+              <div className="p-5 border-b border-slate-200">
+                <h2 className="text-lg font-bold text-slate-800">对比规则配置</h2>
+                <p className="text-xs text-slate-500 mt-1">为每个页签配置表头行和对比规则</p>
+                <div className="mt-6 pt-4 border-t border-slate-100">
+                  <h3 className="text-sm font-semibold text-slate-700">控制价文件页签列表</h3>
+                  <p className="text-xs text-slate-400 mt-1">点击选择页签进行规则配置</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-4">
-                <button className="h-8 px-4 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors">
-                  保存修改
-                </button>
-                <button 
-                  onClick={() => setPreviewFile(null)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-200 hover:text-slate-600 transition-colors"
-                >
-                  <Icon name="X" size={18} />
-                </button>
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50">
+                {recognitionList.map((sheet, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setActiveSheetIndex(i)}
+                    className={`w-full flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-colors border ${
+                      activeSheetIndex === i 
+                        ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm' 
+                        : 'bg-white border-transparent text-slate-600 hover:bg-slate-100 hover:border-slate-200'
+                    }`}
+                  >
+                    {sheet.isCompared ? (
+                      <div className="mr-3 w-4 h-4 shrink-0 rounded-full bg-emerald-500 flex items-center justify-center">
+                        <Icon name="Check" size={12} className="text-white" />
+                      </div>
+                    ) : (
+                      <Icon name="FileText" size={16} className={`mr-3 shrink-0 ${activeSheetIndex === i ? 'text-blue-500' : 'text-slate-400'}`} />
+                    )}
+                    <span className="truncate flex-1 text-left">{sheet.name}</span>
+                  </button>
+                ))}
               </div>
             </div>
-            
-            <div className="flex-1 overflow-auto bg-slate-100 p-6">
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-full overflow-hidden flex flex-col">
-                {/* 模拟表格工具栏 */}
-                <div className="h-12 border-b border-slate-200 flex items-center px-4 space-x-4 bg-slate-50 shrink-0">
-                  <div className="flex items-center space-x-1 border-r border-slate-200 pr-4">
-                    <button className="p-1.5 text-slate-500 hover:bg-slate-200 rounded"><Icon name="Undo" size={16} /></button>
-                    <button className="p-1.5 text-slate-500 hover:bg-slate-200 rounded"><Icon name="Redo" size={16} /></button>
-                  </div>
-                  <div className="flex items-center space-x-1 border-r border-slate-200 pr-4">
-                    <button className="p-1.5 text-slate-700 font-bold hover:bg-slate-200 rounded text-sm px-2">B</button>
-                    <button className="p-1.5 text-slate-700 italic hover:bg-slate-200 rounded text-sm px-2">I</button>
-                    <button className="p-1.5 text-slate-700 underline hover:bg-slate-200 rounded text-sm px-2">U</button>
-                  </div>
-                  <div className="text-sm text-slate-500 flex items-center space-x-2">
-                    <Icon name="Search" size={14} />
-                    <input type="text" placeholder="在表格中搜索..." className="bg-transparent border-none outline-none w-48" />
-                  </div>
+
+            {/* 右侧主体：预览和规则配置 */}
+            <div className="flex-1 flex flex-col min-w-0 bg-slate-50 relative">
+              {/* 右上角关闭按钮 */}
+              <button 
+                onClick={() => setControlRuleFile(null)}
+                className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors shadow-sm"
+              >
+                <Icon name="X" size={18} />
+              </button>
+
+              {/* 上半部分：页签内容预览 */}
+              <div className="flex-1 flex flex-col bg-white min-h-0 border-b border-slate-200">
+                <div className="px-6 py-4 flex items-center justify-between shrink-0 border-b border-slate-100 pr-16">
+                  <h3 className="text-sm font-bold text-slate-800">页签内容预览: <span className="text-blue-600">{recognitionList[activeSheetIndex]?.name}</span></h3>
+                  <span className="text-xs text-slate-500">共 {recognitionList[activeSheetIndex]?.rows} 行</span>
                 </div>
-                
-                {/* 模拟表格内容 */}
-                <div className="flex-1 overflow-auto p-4">
-                  <table className="w-full text-left border-collapse border border-slate-200">
-                    <thead>
-                      <tr className="bg-slate-100">
-                        <th className="border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 text-center w-12">行号</th>
-                        <th className="border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">项目编码</th>
-                        <th className="border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">项目名称</th>
-                        <th className="border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600">项目特征描述</th>
-                        <th className="border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 w-16">计量单位</th>
-                        <th className="border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 w-24">工程量</th>
-                        <th className="border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 w-24">综合单价</th>
-                        <th className="border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 w-24">合价</th>
+                <div className="flex-1 overflow-auto bg-white">
+                  <table className="w-full min-w-max border-collapse text-left text-[13px]">
+                    <thead className="bg-orange-50/50 sticky top-0 z-10 shadow-sm">
+                      <tr>
+                        <th className="border border-slate-200 px-3 py-2 text-center text-slate-500 font-medium w-12 bg-slate-50">行号</th>
+                        {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'].map(col => (
+                          <th key={col} className="border border-slate-200 px-4 py-2 text-center text-slate-600 font-medium bg-orange-50/30">列 {col}</th>
+                        ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => (
-                        <tr key={i} className="hover:bg-blue-50/30">
-                          <td className="border border-slate-200 px-3 py-2 text-xs text-slate-400 text-center bg-slate-50">{i}</td>
-                          <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:bg-blue-50 focus:ring-1 ring-inset ring-blue-500" contentEditable suppressContentEditableWarning>01010100100{i}</td>
-                          <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:bg-blue-50 focus:ring-1 ring-inset ring-blue-500" contentEditable suppressContentEditableWarning>平整场地</td>
-                          <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:bg-blue-50 focus:ring-1 ring-inset ring-blue-500" contentEditable suppressContentEditableWarning>1.土壤类别:三类土 2.弃土运距:自行考虑</td>
-                          <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:bg-blue-50 focus:ring-1 ring-inset ring-blue-500 text-center" contentEditable suppressContentEditableWarning>m2</td>
-                          <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:bg-blue-50 focus:ring-1 ring-inset ring-blue-500 text-right font-mono" contentEditable suppressContentEditableWarning>{(150.5 * i).toFixed(2)}</td>
-                          <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:bg-blue-50 focus:ring-1 ring-inset ring-blue-500 text-right font-mono" contentEditable suppressContentEditableWarning>{(12.5).toFixed(2)}</td>
-                          <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700 outline-none focus:bg-blue-50 focus:ring-1 ring-inset ring-blue-500 text-right font-mono" contentEditable suppressContentEditableWarning>{(150.5 * i * 12.5).toFixed(2)}</td>
+                      {MOCK_PREVIEW_DATA.map(row => (
+                        <tr key={row.id} className="hover:bg-slate-50">
+                          <td className="border border-slate-200 px-3 py-2 text-center text-slate-400 bg-slate-50/50">{row.id}</td>
+                          {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'].map(col => (
+                            <td key={col} className="border border-slate-200 px-4 py-2 text-slate-700 truncate max-w-[200px]">
+                              {row[col as keyof typeof row]}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 下半部分：规则维护 */}
+              <div 
+                className={`flex flex-col bg-slate-50/50 shrink-0 relative transition-all duration-300 ease-in-out ${isRulePanelCollapsed ? 'h-[64px]' : ''}`}
+                style={!isRulePanelCollapsed ? { height: `${rulePanelHeight}px` } : {}}
+              >
+                {/* 拖拽手柄 */}
+                {!isRulePanelCollapsed && (
+                  <div 
+                    className="absolute top-0 left-0 right-0 h-1.5 cursor-row-resize hover:bg-blue-500/20 transition-colors z-20 flex items-center justify-center group"
+                    onMouseDown={handleDragStart}
+                  >
+                    <div className="w-10 h-0.5 bg-slate-300 rounded-full group-hover:bg-blue-400 transition-colors"></div>
+                  </div>
+                )}
+                
+                <div className="px-6 py-4 shrink-0 border-t border-b border-slate-200 bg-white flex items-center justify-between">
+                  <div className="flex items-center space-x-6">
+                    <h3 className="text-base font-bold text-slate-800">规则维护</h3>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-slate-700">本页签是否加入对比</span>
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const newList = [...recognitionList];
+                          const newIsCompared = !newList[activeSheetIndex].isCompared;
+                          newList[activeSheetIndex].isCompared = newIsCompared;
+                          setRecognitionList(newList);
+                          
+                          // 选择否时自动收起面板，选择是时自动展开面板
+                          setIsRulePanelCollapsed(!newIsCompared);
+                        }}
+                        className={`w-[46px] h-[22px] rounded-full relative transition-colors flex items-center ${recognitionList[activeSheetIndex]?.isCompared ? 'bg-blue-600' : 'bg-slate-300'}`}
+                      >
+                        <span className={`absolute text-[10px] font-medium text-white transition-opacity ${recognitionList[activeSheetIndex]?.isCompared ? 'left-2 opacity-100' : 'left-2 opacity-0'}`}>是</span>
+                        <div className={`absolute top-[3px] w-4 h-4 bg-white rounded-full transition-transform ${recognitionList[activeSheetIndex]?.isCompared ? 'translate-x-[26px]' : 'translate-x-[3px]'}`}></div>
+                        <span className={`absolute text-[10px] font-medium text-white transition-opacity ${recognitionList[activeSheetIndex]?.isCompared ? 'right-2 opacity-0' : 'right-2 opacity-100'}`}>否</span>
+                      </button>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setIsRulePanelCollapsed(!isRulePanelCollapsed)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                  >
+                    <Icon name={isRulePanelCollapsed ? "ChevronUp" : "ChevronDown"} size={20} />
+                  </button>
+                </div>
+
+                {!isRulePanelCollapsed && (
+                  <div className="flex-1 overflow-y-auto p-6">
+                    {recognitionList[activeSheetIndex]?.isCompared ? (
+                      <div className="w-full space-y-4 animate-in fade-in duration-300">
+                        <div className="mb-4">
+                          <label className="block text-sm text-slate-600 mb-2">填写表头所在行 (支持多行，逗号分隔，如4,5)</label>
+                          <div className="flex items-center space-x-4">
+                            <input type="text" defaultValue="2" className="flex-1 h-9 px-3 border border-slate-300 rounded focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-sm" />
+                            <label className="flex items-center space-x-2 cursor-pointer">
+                              <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                              <span className="text-sm text-slate-600">覆盖现有配置</span>
+                            </label>
+                            <button className="h-9 px-5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded shadow-sm transition-colors">
+                              解析表头
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          {sheetRules.map((rule, idx) => (
+                            <div key={idx} className="bg-white border border-slate-200 rounded-lg p-3 flex items-center shadow-sm">
+                              <div className="w-14 h-14 bg-slate-50 rounded border border-slate-100 flex flex-col items-center justify-center shrink-0 mr-4">
+                                <span className="text-[10px] text-slate-400 mb-0.5">列</span>
+                                <span className="text-base font-bold text-slate-700">{rule.col}</span>
+                              </div>
+                              <div className="flex-1 mr-6">
+                                <span className="text-xs text-slate-400 block mb-1">列名称</span>
+                                <input 
+                                  type="text" 
+                                  value={rule.name}
+                                  onChange={(e) => {
+                                    const newRules = [...sheetRules];
+                                    newRules[idx].name = e.target.value;
+                                    setSheetRules(newRules);
+                                  }}
+                                  className="w-full h-9 bg-white border border-slate-200 rounded px-3 text-sm font-medium text-slate-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-shadow"
+                                />
+                              </div>
+                              <div className="flex items-start space-x-8">
+                                {/* 列类型 */}
+                                <div className="flex flex-col items-center">
+                                  <div className="relative group flex items-center space-x-1 mb-1.5">
+                                    <span className="text-xs text-blue-600 font-medium">列类型</span>
+                                    <Icon name="HelpCircle" size={14} className="text-blue-500 cursor-help"/>
+                                    {/* Tooltip */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 bg-slate-800 text-white text-xs rounded-lg p-3 shadow-xl z-50">
+                                      <div className="space-y-2">
+                                        <div><span className="font-bold">展示列：</span>仅用于展示数据，不参与比对</div>
+                                        <div><span className="font-bold text-blue-400">信息列：</span>用于判断是否为同一条数据</div>
+                                        <div><span className="font-bold text-emerald-400">比对列：</span>检测该列内容/数值的变化</div>
+                                      </div>
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <button 
+                                      onClick={() => {
+                                        const newRules = [...sheetRules];
+                                        newRules[idx].type = 'display';
+                                        setSheetRules(newRules);
+                                      }}
+                                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${rule.type === 'display' ? 'bg-slate-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >展示列</button>
+                                    <button 
+                                      onClick={() => {
+                                        const newRules = [...sheetRules];
+                                        newRules[idx].type = 'info';
+                                        setSheetRules(newRules);
+                                      }}
+                                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${rule.type === 'info' ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >信息列</button>
+                                    <button 
+                                      onClick={() => {
+                                        const newRules = [...sheetRules];
+                                        newRules[idx].type = 'compare';
+                                        setSheetRules(newRules);
+                                      }}
+                                      className={`px-3 py-1 text-xs font-medium rounded transition-colors ${rule.type === 'compare' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                    >比对列</button>
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 mt-1.5 h-3">
+                                    {rule.type === 'display' && '仅展示，不参与比对'}
+                                    {rule.type === 'info' && '判断同一条数据'}
+                                    {rule.type === 'compare' && '判断值是否变化'}
+                                  </div>
+                                </div>
+
+                                {/* 数据过滤 */}
+                                <div className="flex flex-col">
+                                  <div className="relative group flex items-center space-x-1 mb-1.5">
+                                    <span className="text-xs text-blue-600 font-medium">数据过滤</span>
+                                    <Icon name="HelpCircle" size={14} className="text-blue-500 cursor-help"/>
+                                    {/* Data Filter Tooltip */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-56 bg-slate-800 text-white text-xs rounded-lg p-3 shadow-xl z-50">
+                                      <div className="space-y-2">
+                                        <div><span className="font-bold text-blue-400">非空：</span>自动剔除该列为空的无效记录</div>
+                                        <div><span className="font-bold text-emerald-400">数字：</span>要求该列必须为有效的数字</div>
+                                      </div>
+                                      <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="flex items-center space-x-2 cursor-pointer group/cb">
+                                      <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-colors ${rule.notEmpty ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white group-hover/cb:border-blue-400'}`}>
+                                        {rule.notEmpty && <Icon name="Check" size={10} className="text-white" />}
+                                      </div>
+                                      <input 
+                                        type="checkbox" 
+                                        checked={rule.notEmpty} 
+                                        onChange={(e) => {
+                                          const newRules = [...sheetRules];
+                                          newRules[idx].notEmpty = e.target.checked;
+                                          setSheetRules(newRules);
+                                        }}
+                                        className="sr-only" 
+                                      />
+                                      <span className="text-xs font-medium text-slate-700">非空</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer group/cb">
+                                      <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-colors ${rule.isNumber ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white group-hover/cb:border-blue-400'}`}>
+                                        {rule.isNumber && <Icon name="Check" size={10} className="text-white" />}
+                                      </div>
+                                      <input 
+                                        type="checkbox" 
+                                        checked={rule.isNumber} 
+                                        onChange={(e) => {
+                                          const newRules = [...sheetRules];
+                                          newRules[idx].isNumber = e.target.checked;
+                                          setSheetRules(newRules);
+                                        }}
+                                        className="sr-only" 
+                                      />
+                                      <span className="text-xs font-medium text-slate-700">数字</span>
+                                    </label>
+                                  </div>
+                                </div>
+
+                                {/* 删除按钮 */}
+                                <div className="flex flex-col justify-center h-[56px]">
+                                  <button className="w-7 h-7 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors ml-2">
+                                    <Icon name="Trash2" size={16} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                        <Icon name="Settings2" size={48} className="mb-4 text-slate-300" />
+                        <p>开启“是否对比”后可配置该页签的规则</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {/* 投标文件匹配结果弹窗 */}
+      {tenderMatchFile && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="relative bg-white w-[90vw] h-[90vh] rounded-2xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-white">
+              <div className="flex items-center space-x-3">
+                <h3 className="text-lg font-bold text-slate-800">识别匹配结果</h3>
+                <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-medium">投标文件</span>
+              </div>
+              <button 
+                onClick={() => setTenderMatchFile(null)} 
+                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <Icon name="X" size={20} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6 bg-slate-50/50">
+              <div className="max-w-6xl mx-auto space-y-6">
+                {/* File Info Card */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex items-start space-x-4">
+                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                    <Icon name="FileText" size={24} />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-base font-bold text-slate-800 mb-1">{tenderMatchFile.name}</h4>
+                    <p className="text-sm text-slate-500">基于控制价规则进行自动匹配，共 19 个页签，成功匹配 13 个对比规则</p>
+                  </div>
+                  <div className="shrink-0 flex space-x-8 text-sm">
+                    <div className="flex flex-col items-end">
+                      <span className="text-slate-500 mb-1">页签匹配度</span>
+                      <span className="text-xl font-bold text-emerald-500">100%</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-slate-500 mb-1">表头匹配度</span>
+                      <span className="text-xl font-bold text-blue-600">85%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Result Table */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 border-b border-slate-200">
+                      <tr>
+                        <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 w-64">投标文件页签名称</th>
+                        <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 w-64">匹配控制价页签</th>
+                        <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 w-24 text-center">数据行数</th>
+                        <th className="px-6 py-4 text-[13px] font-semibold text-slate-500">匹配的表头字段</th>
+                        <th className="px-6 py-4 text-[13px] font-semibold text-slate-500 w-32">匹配置信度</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {recognitionList.map((sheet, i) => (
+                        <tr key={`sheet-${i}`} className="hover:bg-slate-50/50">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center space-x-2">
+                              {sheet.matched ? <Icon name="CheckCircle2" size={16} className="text-green-500" /> : <Icon name="AlertCircle" size={16} className="text-orange-400" />}
+                              <span className={`text-sm ${sheet.matched ? 'font-medium text-slate-800' : 'text-slate-600'}`}>{sheet.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center space-x-2 text-sm">
+                              {sheet.matched ? (
+                                <span className="text-blue-600 font-medium bg-blue-50 px-2 py-1 rounded">{sheet.name}</span>
+                              ) : (
+                                <span className="text-slate-400">- 未匹配 -</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-600 text-center">{sheet.rows}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              {sheet.matched ? (
+                                <>
+                                  {['项目编码', '项目名称', '项目特征描述', '计量单位'].map(tag => (
+                                    <span key={tag} className="inline-flex px-2 py-1 bg-green-50 text-green-600 text-xs font-medium rounded border border-green-100">
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </>
+                              ) : sheet.field ? (
+                                <span className="inline-flex px-2 py-1 bg-orange-50 text-orange-600 text-xs font-medium rounded">
+                                  {sheet.field} (未命中规则)
+                                </span>
+                              ) : <span className="text-xs text-slate-400">无规则要求</span>}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center space-x-2">
+                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full ${sheet.matched ? 'bg-green-500' : (sheet.confidence && sheet.confidence > 0 ? (sheet.confidence > 30 ? 'bg-orange-400' : 'bg-red-500') : '')}`} 
+                                  style={{ width: `${sheet.confidence || (sheet.matched ? 100 : 0)}%` }}
+                                ></div>
+                              </div>
+                              <span className="text-xs text-slate-500 w-8 text-right">{sheet.confidence || (sheet.matched ? 100 : 0)}%</span>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
