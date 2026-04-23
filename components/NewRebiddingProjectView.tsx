@@ -163,6 +163,35 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
     if (someSelected) return 'partial';
     return 'none';
   };
+
+  const handleToggleCategorySelection = (categoryId: string) => {
+    if (categoryId === 'unbalanced') {
+      setCheckSettings(prev => ({
+        ...prev,
+        unbalanced: {
+          ...prev.unbalanced,
+          enabled: !prev.unbalanced.enabled
+        }
+      }));
+      return;
+    }
+
+    setCheckSettings(prev => {
+      const categoryData = (prev as any)[categoryId];
+      if (!categoryData) return prev;
+      const keys = Object.keys(categoryData).filter(k => typeof categoryData[k] === 'boolean');
+      const allSelected = keys.every(k => categoryData[k]);
+      const nextValue = !allSelected;
+      const nextCategoryData = { ...categoryData };
+      keys.forEach(k => {
+        nextCategoryData[k] = nextValue;
+      });
+      return {
+        ...prev,
+        [categoryId]: nextCategoryData
+      };
+    });
+  };
   
   const [activeFileTab, setActiveFileTab] = useState<'bidding' | 'control' | 'tender'>('bidding');
   
@@ -447,7 +476,7 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>
                   {isSelected && <Icon name="Check" size={14} className="text-white" />}
                 </div>
-                <input type="checkbox" className="sr-only" checked={isSelected} onChange={(e) => setCheckSettings(prev => ({ ...prev, [category]: { ...(prev as any)[category], [item.key]: e.target.checked } }))} />
+                <input type="checkbox" className="hidden" checked={isSelected} onChange={(e) => setCheckSettings(prev => ({ ...prev, [category]: { ...(prev as any)[category], [item.key]: e.target.checked } }))} />
               </div>
               <div className={`text-[14px] leading-relaxed ${isSelected ? 'text-slate-800 font-medium' : 'text-slate-600'}`}>{item.label}</div>
             </label>
@@ -467,7 +496,7 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
             <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>
               {isSelected && <Icon name="Check" size={14} className="text-white" />}
             </div>
-            <input type="checkbox" className="sr-only" checked={isSelected} onChange={(e) => setCheckSettings(prev => ({ ...prev, arithmetic: { ...prev.arithmetic, [mainKey]: e.target.checked } }))} />
+            <input type="checkbox" className="hidden" checked={isSelected} onChange={(e) => setCheckSettings(prev => ({ ...prev, arithmetic: { ...prev.arithmetic, [mainKey]: e.target.checked } }))} />
           </div>
           <div className={`text-[14px] leading-relaxed flex-1 ${isSelected ? 'text-slate-800 font-medium' : 'text-slate-600'}`}>{mainLabel}</div>
         </label>
@@ -502,7 +531,7 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
                 <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${checkSettings.unbalanced.enabled ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>
                   {checkSettings.unbalanced.enabled && <Icon name="Check" size={14} className="text-white" />}
                 </div>
-                <input type="checkbox" className="sr-only" checked={checkSettings.unbalanced.enabled} onChange={(e) => setCheckSettings(prev => ({ ...prev, unbalanced: { ...prev.unbalanced, enabled: e.target.checked } }))} />
+                <input type="checkbox" className="hidden" checked={checkSettings.unbalanced.enabled} onChange={(e) => setCheckSettings(prev => ({ ...prev, unbalanced: { ...prev.unbalanced, enabled: e.target.checked } }))} />
               </div>
               <div className={`text-[14px] leading-relaxed flex-1 ${checkSettings.unbalanced.enabled ? 'text-slate-800 font-medium' : 'text-slate-600'}`}>
                 开启不平衡报价检查
@@ -835,39 +864,46 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
               </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1">
               {/* 左侧导航栏 */}
-              <div className="w-64 border-r border-slate-200 bg-slate-50/50 overflow-y-auto">
+              <div className="w-64 border-r border-slate-200 bg-slate-50/50">
                 <div className="py-2">
                   {CHECK_CATEGORIES.map(category => {
                     const status = getCategoryStatus(category.id);
                     return (
-                      <button
+                      <div
                         key={category.id}
                         onClick={() => setActiveCheckTab(category.id)}
-                        className={`w-full flex items-center justify-between px-6 py-3.5 text-sm transition-colors relative ${
+                        className={`w-full flex items-center justify-between px-6 py-3.5 text-sm transition-colors relative cursor-pointer ${
                           activeCheckTab === category.id 
                             ? 'bg-white text-blue-600 font-medium before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-blue-600' 
                             : 'text-slate-600 hover:bg-slate-100/80'
                         }`}
                       >
                         <span>{category.label}</span>
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                          status === 'all' ? 'bg-blue-600 border-blue-600' :
-                          status === 'partial' ? 'bg-blue-600 border-blue-600' :
-                          'border-slate-300 bg-white'
-                        }`}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleCategorySelection(category.id);
+                          }}
+                          className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                            status === 'all' ? 'bg-blue-600 border-blue-600' :
+                            status === 'partial' ? 'bg-blue-600 border-blue-600' :
+                            'border-slate-300 bg-white'
+                          }`}
+                        >
                           {status === 'all' && <Icon name="Check" size={12} className="text-white" />}
                           {status === 'partial' && <div className="w-2 h-0.5 bg-white rounded-full"></div>}
-                        </div>
-                      </button>
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
               </div>
 
               {/* 右侧内容区 */}
-              <div className="flex-1 bg-white p-6 overflow-y-auto">
+              <div className="flex-1 bg-white p-6">
                 <div className="max-w-4xl">
                   <h3 className="text-base font-bold text-blue-600 mb-6 pb-2 border-b border-blue-100">
                     {CHECK_CATEGORIES.find(c => c.id === activeCheckTab)?.label || '检查项'}
@@ -1125,7 +1161,7 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
                                           newRules[idx].notEmpty = e.target.checked;
                                           setSheetRules(newRules);
                                         }}
-                                        className="sr-only" 
+                                        className="hidden" 
                                       />
                                       <span className="text-xs font-medium text-slate-700">非空</span>
                                     </label>
@@ -1141,7 +1177,7 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
                                           newRules[idx].isNumber = e.target.checked;
                                           setSheetRules(newRules);
                                         }}
-                                        className="sr-only" 
+                                        className="hidden" 
                                       />
                                       <span className="text-xs font-medium text-slate-700">数字</span>
                                     </label>
