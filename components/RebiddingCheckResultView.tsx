@@ -1724,6 +1724,117 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
           </div>
           <div className="p-6 overflow-auto flex-1 bg-slate-50/50">
             {problemDetailDrawer.view === 'breakdown' ? (
+              problemDetailDrawer.type === 'unbalanced' ? (() => {
+                const item = problemDetailDrawer.selectedItem;
+                if (!item) return null;
+
+                const controlPrice = Number(item.controlPrice ?? 0);
+                const bidders = (item.bidders ?? {}) as Record<string, number>;
+                let basePrice = controlPrice;
+                if (Object.keys(bidders).length > 0) {
+                  const prices = Object.values(bidders) as number[];
+                  if (prices.length > 0) {
+                    if (unbalancedSettings.quoteType === 'bidAvg') {
+                      basePrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+                    } else if (unbalancedSettings.quoteType === 'bidLowest') {
+                      basePrice = Math.min(...prices);
+                    } else if (unbalancedSettings.quoteType === 'bidHighestLowestAvg') {
+                      if (prices.length > 2) {
+                        const sorted = [...prices].sort((a, b) => a - b);
+                        const trimmed = sorted.slice(1, -1);
+                        basePrice = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
+                      } else {
+                        basePrice = prices.reduce((a, b) => a + b, 0) / prices.length;
+                      }
+                    }
+                  }
+                }
+
+                // 获取当前投标单位单价
+                const bidderPrice = bidders[problemDetailDrawer.bidder || ''] ?? controlPrice;
+                
+                const basePriceName = unbalancedSettings.quoteType === 'controlPrice' ? '控制价' : 
+                                      unbalancedSettings.quoteType === 'bidAvg' ? '投标均价' : 
+                                      unbalancedSettings.quoteType === 'bidLowest' ? '投标最低价' : '去极值均价';
+
+                return (
+                  <table className="w-full text-center border-collapse border border-slate-200 bg-white">
+                    <thead className="bg-slate-50 text-[13px] text-slate-700 font-semibold sticky top-0 shadow-sm z-10">
+                      <tr>
+                        <th className="border border-slate-200 py-3 px-3 whitespace-nowrap">费用构成</th>
+                        <th className="border border-slate-200 py-3 px-3 whitespace-nowrap">{basePriceName}</th>
+                        <th className="border border-slate-200 py-3 px-3 whitespace-nowrap">{problemDetailDrawer.bidder || '投标人'}</th>
+                        <th className="border border-slate-200 py-3 px-3 whitespace-nowrap text-slate-700">差额</th>
+                        <th className="border border-slate-200 py-3 px-3 whitespace-nowrap text-slate-700">偏差百分比</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-sm">
+                      {priceBreakdownRows.map((row, idx) => {
+                        const basePriceRow = basePrice * row.ratio;
+                        const bidderPriceRow = bidderPrice * row.ratio;
+                        const diffRow = bidderPriceRow - basePriceRow;
+                        const diffPercentRow = basePriceRow > 0 ? (diffRow / basePriceRow) * 100 : 0;
+                        return (
+                          <tr key={idx} className="hover:bg-blue-50/30 transition-colors bg-white">
+                            <td className="border border-slate-200 py-2 px-3 font-medium text-slate-700 whitespace-nowrap">{row.label}</td>
+                            <td className="border border-slate-200 py-2 px-3">
+                              <div className="flex items-center justify-end space-x-2">
+                                <span className="font-mono">{basePriceRow.toFixed(2)}</span>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 w-10 justify-center">
+                                  {(row.ratio * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="border border-slate-200 py-2 px-3">
+                              <div className="flex items-center justify-end space-x-2">
+                                <span className="font-mono">{bidderPriceRow.toFixed(2)}</span>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 w-10 justify-center">
+                                  {(row.ratio * 100).toFixed(0)}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="border border-slate-200 py-2 px-3 text-right">
+                              <span className={`font-mono ${diffRow > 0 ? 'text-red-500' : diffRow < 0 ? 'text-green-500' : 'text-slate-600'}`}>
+                                {diffRow > 0 ? '+' : ''}{diffRow.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="border border-slate-200 py-2 px-3 text-right">
+                              <span className={`font-mono ${diffPercentRow > 0 ? 'text-red-500' : diffPercentRow < 0 ? 'text-green-500' : 'text-slate-600'}`}>
+                                {diffPercentRow > 0 ? '+' : ''}{diffPercentRow.toFixed(2)}%
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      <tr className="bg-slate-50 font-medium text-slate-800">
+                        <td className="border border-slate-200 py-3 px-3 whitespace-nowrap text-center">综合单价</td>
+                        <td className="border border-slate-200 py-3 px-3 text-right font-mono pr-14">{basePrice.toFixed(2)}</td>
+                        <td className="border border-slate-200 py-3 px-3 text-right font-mono pr-14">{bidderPrice.toFixed(2)}</td>
+                        <td className="border border-slate-200 py-3 px-3 text-right font-mono">
+                          {(() => {
+                            const diff = bidderPrice - basePrice;
+                            return (
+                              <span className={diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-slate-600'}>
+                                {diff > 0 ? '+' : ''}{diff.toFixed(2)}
+                              </span>
+                            );
+                          })()}
+                        </td>
+                        <td className="border border-slate-200 py-3 px-3 text-right font-mono">
+                          {(() => {
+                            const diffPercent = basePrice > 0 ? ((bidderPrice - basePrice) / basePrice) * 100 : 0;
+                            return (
+                              <span className={diffPercent > 0 ? 'text-red-500' : diffPercent < 0 ? 'text-green-500' : 'text-slate-600'}>
+                                {diffPercent > 0 ? '+' : ''}{diffPercent.toFixed(2)}%
+                              </span>
+                            );
+                          })()}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                );
+              })() : (
               <table className="w-full text-center border-collapse border border-slate-200 bg-white">
                 <thead className="bg-slate-50 text-[13px] text-slate-700 font-semibold sticky top-0 shadow-sm z-10">
                   <tr>
@@ -1808,7 +1919,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                   </tr>
                 </tbody>
               </table>
-            ) : problemDetailDrawer.type === 'samePrice' || problemDetailDrawer.type === 'unbalanced' ? (
+            )) : problemDetailDrawer.type === 'samePrice' || problemDetailDrawer.type === 'unbalanced' ? (
               <table className="w-full text-center border-collapse border border-slate-200 bg-white">
                 <thead className="bg-slate-50 text-[13px] text-slate-700 font-semibold sticky top-0 shadow-sm z-10">
                   <tr>
@@ -2018,10 +2129,11 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const unbalancedBasePriceName = unbalancedSettings.quoteType === 'controlPrice' ? '控制价' : 
-                                unbalancedSettings.quoteType === 'bidAvg' ? '投标均价' : 
-                                unbalancedSettings.quoteType === 'bidLowest' ? '投标最低价' : '去极值均价';
-                              openCompareDrawer('price', displayItem, problemDetailDrawer.bidder || '投标人', unbalancedBidderPrice, e, undefined, 'unbalanced', unbalancedBasePriceName);
+                              setProblemDetailDrawer(prev => ({
+                                ...prev,
+                                view: 'breakdown',
+                                selectedItem: displayItem
+                              }));
                             }}
                             className={`w-full text-right hover:underline text-blue-600 ${Math.abs(unbalancedDiffPercent) > floatRange ? 'text-red-500' : 'text-slate-700'}`}
                           >
