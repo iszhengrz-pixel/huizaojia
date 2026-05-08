@@ -121,7 +121,9 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
     compliance: {
       wrongItem: true, addedItem: true, missingItem: true,
       sameListPrice: true, sameMaterialPrice: true,
-      nonCompetitiveChanged: true, exceedLimit: true
+      nonCompetitiveChanged: true, exceedLimit: true,
+      sameListGroups: [{ id: 'default', name: '默认对比组', sheets: ['全部文件-全部页签'] }],
+      sameMaterialGroups: [{ id: 'default', name: '默认对比组', sheets: ['全部文件-全部页签'] }]
     },
     arithmetic: {
       emptyZeroNegative: true,
@@ -250,6 +252,15 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
   // 分页状态
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
+
+  // 文件选择弹窗状态
+  const [isFileSelectModalOpen, setIsFileSelectModalOpen] = useState(false);
+  const [activeFileGroup, setActiveFileGroup] = useState<{ category: string, itemKey: string, groupId: string } | null>(null);
+  const [selectedFileMap, setSelectedFileMap] = useState<Record<string, string[]>>({});
+  const [activeModalFileId, setActiveModalFileId] = useState<string | null>(null);
+
+  // 模拟所有可用的页签
+  const MOCK_SHEETS = ['封面', '目录', '报价汇总表', '土建工程综合单价分析表', '分部分项工程量清单'];
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -465,21 +476,196 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
     );
   };
 
-  const renderCheckboxes = (category: string, items: {key: string, label: string}[]) => {
+  const [expandedSettings, setExpandedSettings] = useState<Record<string, boolean>>({});
+
+  const toggleSettings = (key: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExpandedSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleGroupChange = (category: string, itemKey: string, groupId: string, field: string, value: any) => {
+    const groupKey = itemKey === 'sameListPrice' ? 'sameListGroups' : 'sameMaterialGroups';
+    setCheckSettings(prev => {
+      const groups = (prev as any)[category][groupKey];
+      const newGroups = groups.map((g: any) => g.id === groupId ? { ...g, [field]: value } : g);
+      return {
+        ...prev,
+        [category]: {
+          ...(prev as any)[category],
+          [groupKey]: newGroups
+        }
+      };
+    });
+  };
+
+  const handleAddGroup = (category: string, itemKey: string) => {
+    const groupKey = itemKey === 'sameListPrice' ? 'sameListGroups' : 'sameMaterialGroups';
+    setCheckSettings(prev => {
+      const groups = (prev as any)[category][groupKey];
+      return {
+        ...prev,
+        [category]: {
+          ...(prev as any)[category],
+          [groupKey]: [...groups, { id: Math.random().toString(36).substr(2, 9), name: '', sheets: [] }]
+        }
+      };
+    });
+  };
+
+  const handleDeleteGroup = (category: string, itemKey: string, groupId: string) => {
+    const groupKey = itemKey === 'sameListPrice' ? 'sameListGroups' : 'sameMaterialGroups';
+    setCheckSettings(prev => {
+      const groups = (prev as any)[category][groupKey];
+      return {
+        ...prev,
+        [category]: {
+          ...(prev as any)[category],
+          [groupKey]: groups.filter((g: any) => g.id !== groupId)
+        }
+      };
+    });
+  };
+
+  const renderCheckboxes = (category: string, items: {key: string, label: string, hasSettings?: boolean}[]) => {
     return (
       <div className="space-y-3">
         {items.map(item => {
           const isSelected = (checkSettings as any)[category][item.key];
+          const isExpanded = expandedSettings[item.key];
+          const groupKey = item.key === 'sameListPrice' ? 'sameListGroups' : 'sameMaterialGroups';
+          const groups = (checkSettings as any)[category][groupKey] || [];
+          
           return (
-            <label key={item.key} className={`flex items-start p-4 rounded-lg border-2 cursor-pointer transition-all ${isSelected ? 'border-blue-100 bg-blue-50/30' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
-              <div className="pt-0.5 mr-4 shrink-0">
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>
-                  {isSelected && <Icon name="Check" size={14} className="text-white" />}
+            <div key={item.key} className={`flex flex-col rounded-lg border-2 transition-all ${isSelected ? 'border-blue-100 bg-blue-50/30' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
+              <label className="flex items-start p-4 cursor-pointer">
+                <div className="pt-0.5 mr-4 shrink-0">
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white'}`}>
+                    {isSelected && <Icon name="Check" size={14} className="text-white" />}
+                  </div>
+                  <input type="checkbox" className="hidden" checked={isSelected} onChange={(e) => setCheckSettings(prev => ({ ...prev, [category]: { ...(prev as any)[category], [item.key]: e.target.checked } }))} />
                 </div>
-                <input type="checkbox" className="hidden" checked={isSelected} onChange={(e) => setCheckSettings(prev => ({ ...prev, [category]: { ...(prev as any)[category], [item.key]: e.target.checked } }))} />
-              </div>
-              <div className={`text-[14px] leading-relaxed ${isSelected ? 'text-slate-800 font-medium' : 'text-slate-600'}`}>{item.label}</div>
-            </label>
+                <div className={`text-[14px] leading-relaxed flex-1 ${isSelected ? 'text-slate-800 font-medium' : 'text-slate-600'}`}>{item.label}</div>
+                {item.hasSettings && (
+                  <button 
+                    onClick={(e) => toggleSettings(item.key, e)}
+                    className="ml-4 px-4 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded transition-colors flex items-center space-x-1"
+                  >
+                    <span>设置</span>
+                    <Icon name={isExpanded ? "ChevronUp" : "ChevronDown"} size={14} />
+                  </button>
+                )}
+              </label>
+              
+              {item.hasSettings && isExpanded && (
+                <div className="border-t border-blue-100 bg-white rounded-b-lg">
+                  <div className="w-full">
+                    <table className="w-full text-left">
+                      <thead className="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3 text-[13px] font-medium text-slate-500 w-[200px]">对比组名称</th>
+                          <th className="px-4 py-3 text-[13px] font-medium text-slate-500">对比文件页签</th>
+                          <th className="px-4 py-3 text-[13px] font-medium text-slate-500 w-[100px] text-center">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {groups.map((group: any) => (
+                          <tr key={group.id} className="hover:bg-slate-50/50">
+                            <td className="px-4 py-3">
+                              <input 
+                                type="text" 
+                                value={group.name}
+                                onChange={(e) => handleGroupChange(category, item.key, group.id, 'name', e.target.value)}
+                                disabled={group.id === 'default'}
+                                className="w-full h-9 px-3 text-sm border border-slate-200 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:bg-slate-50 disabled:text-slate-500"
+                                placeholder="输入对比组名称"
+                              />
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-wrap gap-2 items-center min-h-[36px] p-1.5 border border-slate-200 rounded bg-white">
+                                {group.sheets.map((sheet: string, idx: number) => (
+                                  <div key={idx} className="flex items-center space-x-1 px-2 py-1 bg-blue-50 text-blue-600 text-[13px] rounded">
+                                    <span>{sheet}</span>
+                                    {group.id !== 'default' && (
+                                      <button 
+                                        onClick={() => handleGroupChange(category, item.key, group.id, 'sheets', group.sheets.filter((_: any, i: number) => i !== idx))}
+                                        className="hover:text-blue-800"
+                                      >
+                                        <Icon name="X" size={12} />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                                {group.id !== 'default' && (
+                                  <div 
+                                    className="flex-1 min-w-[120px] text-[13px] px-2 py-1 text-slate-400 bg-transparent cursor-pointer hover:text-blue-600 transition-colors"
+                                    onClick={() => {
+                                      setActiveFileGroup({ category, itemKey: item.key, groupId: group.id });
+                                      
+                                      // Parse existing sheets into selectedFileMap
+                                      const newMap: Record<string, string[]> = {};
+                                      group.sheets.forEach((s: string) => {
+                                        if (s === '全部文件-全部页签') {
+                                          [...controlFiles, ...tenderFiles].forEach(f => {
+                                            newMap[f.id] = [...MOCK_SHEETS];
+                                          });
+                                        } else {
+                                          const parts = s.split('-');
+                                          if (parts.length === 2) {
+                                            const file = [...controlFiles, ...tenderFiles].find(f => f.name === parts[0]);
+                                            if (file) {
+                                              if (!newMap[file.id]) newMap[file.id] = [];
+                                              if (!newMap[file.id].includes(parts[1])) {
+                                                newMap[file.id].push(parts[1]);
+                                              }
+                                            }
+                                          }
+                                        }
+                                      });
+                                      setSelectedFileMap(newMap);
+                                      
+                                      const allFiles = [...controlFiles, ...tenderFiles];
+                                      if (allFiles.length > 0) {
+                                        setActiveModalFileId(allFiles[0].id);
+                                      }
+                                      
+                                      setIsFileSelectModalOpen(true);
+                                    }}
+                                  >
+                                    选择文件...
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {group.id !== 'default' ? (
+                                <button 
+                                  onClick={() => handleDeleteGroup(category, item.key, group.id)}
+                                  className="text-red-500 hover:text-red-600 text-sm font-medium"
+                                >
+                                  删除
+                                </button>
+                              ) : (
+                                <span className="text-slate-300 text-sm">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="p-3 bg-slate-50 border-t border-slate-100">
+                      <button 
+                        onClick={() => handleAddGroup(category, item.key)}
+                        className="flex items-center space-x-1 text-sm text-blue-600 font-medium hover:text-blue-700"
+                      >
+                        <Icon name="Plus" size={16} />
+                        <span>添加行</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>
@@ -511,7 +697,7 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
           { key: 'wrongItem', label: '错项检查' },
           { key: 'addedItem', label: '增项检查' },
           { key: 'missingItem', label: '漏项检查' },
-          { key: 'sameListPrice', label: '相同清单价一致检查' },
+          { key: 'sameListPrice', label: '相同清单价一致检查', hasSettings: true },
           { key: 'sameMaterialPrice', label: '相同材料价一致检查' },
           { key: 'nonCompetitiveChanged', label: '不可竞争金额是否改动' },
           { key: 'exceedLimit', label: '投标价是否突破限价' }
@@ -591,8 +777,222 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
     }
   };
 
+  const renderFileSelectModal = () => {
+    if (!isFileSelectModalOpen) return null;
+
+    const allFiles = [...controlFiles, ...tenderFiles];
+    
+    const handleFileCheckboxChange = (fileId: string, checked: boolean) => {
+      setSelectedFileMap(prev => {
+        const next = { ...prev };
+        if (checked) {
+          next[fileId] = [...MOCK_SHEETS];
+        } else {
+          next[fileId] = [];
+        }
+        return next;
+      });
+    };
+
+    const handleAllFilesChange = (checked: boolean) => {
+      setSelectedFileMap(prev => {
+        const next = { ...prev };
+        allFiles.forEach(f => {
+          next[f.id] = checked ? [...MOCK_SHEETS] : [];
+        });
+        return next;
+      });
+    };
+
+    const handleSheetChange = (sheet: string, checked: boolean) => {
+      if (!activeModalFileId) return;
+      setSelectedFileMap(prev => {
+        const next = { ...prev };
+        const current = next[activeModalFileId] || [];
+        if (checked) {
+          next[activeModalFileId] = [...current, sheet];
+        } else {
+          next[activeModalFileId] = current.filter(s => s !== sheet);
+        }
+        return next;
+      });
+    };
+
+    const handleAllSheetsChange = (checked: boolean) => {
+      if (!activeModalFileId) return;
+      setSelectedFileMap(prev => {
+        const next = { ...prev };
+        if (checked) {
+          next[activeModalFileId] = [...MOCK_SHEETS];
+        } else {
+          next[activeModalFileId] = [];
+        }
+        return next;
+      });
+    };
+
+    const handleConfirm = () => {
+      if (activeFileGroup) {
+        // Calculate new sheets array
+        let allSelected = true;
+        const newSheets: string[] = [];
+        
+        if (allFiles.length === 0) {
+          allSelected = false;
+        } else {
+          allFiles.forEach(f => {
+            const selectedSheets = selectedFileMap[f.id] || [];
+            if (selectedSheets.length !== MOCK_SHEETS.length) {
+              allSelected = false;
+            }
+            selectedSheets.forEach(s => {
+              newSheets.push(`${f.name}-${s}`);
+            });
+          });
+        }
+
+        const finalSheets = allSelected ? ['全部文件-全部页签'] : newSheets;
+        handleGroupChange(activeFileGroup.category, activeFileGroup.itemKey, activeFileGroup.groupId, 'sheets', finalSheets);
+      }
+      setIsFileSelectModalOpen(false);
+    };
+
+    // Derived state for 'Select All Files'
+    const totalFiles = allFiles.length;
+    const selectedFilesCount = allFiles.filter(f => (selectedFileMap[f.id] || []).length === MOCK_SHEETS.length).length;
+    const someFilesSelected = allFiles.some(f => (selectedFileMap[f.id] || []).length > 0);
+    const isAllFilesChecked = totalFiles > 0 && selectedFilesCount === totalFiles;
+    const isAllFilesIndeterminate = !isAllFilesChecked && someFilesSelected;
+
+    // Derived state for 'Select All Sheets' (for active file)
+    const activeFileSelectedSheets = activeModalFileId ? (selectedFileMap[activeModalFileId] || []) : [];
+    const isAllSheetsChecked = activeFileSelectedSheets.length === MOCK_SHEETS.length;
+    const isAllSheetsIndeterminate = !isAllSheetsChecked && activeFileSelectedSheets.length > 0;
+
+    return createPortal(
+      <div className="fixed inset-0 z-[300] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+        <div className="bg-white w-[800px] h-[600px] rounded-xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+            <h3 className="text-lg font-bold text-slate-800">选择文件</h3>
+            <button 
+              onClick={() => setIsFileSelectModalOpen(false)}
+              className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            >
+              <Icon name="X" size={20} />
+            </button>
+          </div>
+          
+          <div className="flex-1 flex min-h-0">
+            {/* Left: Files */}
+            <div className="w-1/2 border-r border-slate-100 flex flex-col">
+              <div className="px-4 py-3 border-b border-slate-50 bg-slate-50/50">
+                <label className="flex items-center space-x-3 cursor-pointer group">
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isAllFilesChecked ? 'bg-blue-600 border-blue-600' : isAllFilesIndeterminate ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
+                    {isAllFilesChecked && <Icon name="Check" size={12} className="text-white" strokeWidth={3} />}
+                    {isAllFilesIndeterminate && <div className="w-2 h-0.5 bg-white rounded-full"></div>}
+                  </div>
+                  <input type="checkbox" className="hidden" checked={isAllFilesChecked} onChange={(e) => handleAllFilesChange(e.target.checked)} />
+                  <span className="text-sm font-medium text-slate-700">全选文件</span>
+                </label>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {allFiles.length === 0 ? (
+                  <div className="text-center py-10 text-sm text-slate-400">暂无上传文件</div>
+                ) : (
+                  allFiles.map(file => {
+                    const fileSelectedCount = (selectedFileMap[file.id] || []).length;
+                    const isFileChecked = fileSelectedCount === MOCK_SHEETS.length;
+                    const isFileIndeterminate = !isFileChecked && fileSelectedCount > 0;
+                    const isActive = activeModalFileId === file.id;
+
+                    return (
+                      <div 
+                        key={file.id}
+                        onClick={() => setActiveModalFileId(file.id)}
+                        className={`flex items-center px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${isActive ? 'bg-blue-50' : 'hover:bg-slate-50'}`}
+                      >
+                        <label className="flex items-center cursor-pointer mr-3" onClick={(e) => e.stopPropagation()}>
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isFileChecked ? 'bg-blue-600 border-blue-600' : isFileIndeterminate ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white hover:border-blue-400'}`}>
+                            {isFileChecked && <Icon name="Check" size={12} className="text-white" strokeWidth={3} />}
+                            {isFileIndeterminate && <div className="w-2 h-0.5 bg-white rounded-full"></div>}
+                          </div>
+                          <input type="checkbox" className="hidden" checked={isFileChecked} onChange={(e) => handleFileCheckboxChange(file.id, e.target.checked)} />
+                        </label>
+                        <Icon name="FileText" size={16} className={`mr-2 shrink-0 ${isActive ? 'text-blue-500' : 'text-slate-400'}`} />
+                        <span className={`text-sm truncate flex-1 ${isActive ? 'text-blue-700 font-medium' : 'text-slate-700'}`}>{file.name}</span>
+                        {fileSelectedCount > 0 && (
+                          <span className="text-xs text-slate-400 ml-2">{fileSelectedCount}/{MOCK_SHEETS.length}</span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Right: Sheets */}
+            <div className="w-1/2 flex flex-col bg-slate-50/30">
+              {activeModalFileId ? (
+                <>
+                  <div className="px-4 py-3 border-b border-slate-50 bg-slate-50/50">
+                    <label className="flex items-center space-x-3 cursor-pointer group">
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isAllSheetsChecked ? 'bg-blue-600 border-blue-600' : isAllSheetsIndeterminate ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
+                        {isAllSheetsChecked && <Icon name="Check" size={12} className="text-white" strokeWidth={3} />}
+                        {isAllSheetsIndeterminate && <div className="w-2 h-0.5 bg-white rounded-full"></div>}
+                      </div>
+                      <input type="checkbox" className="hidden" checked={isAllSheetsChecked} onChange={(e) => handleAllSheetsChange(e.target.checked)} />
+                      <span className="text-sm font-medium text-slate-700">全选页签</span>
+                    </label>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {MOCK_SHEETS.map((sheet, idx) => {
+                      const isSheetChecked = activeFileSelectedSheets.includes(sheet);
+                      return (
+                        <label 
+                          key={idx}
+                          className="flex items-center px-3 py-2.5 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors group"
+                        >
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors mr-3 ${isSheetChecked ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
+                            {isSheetChecked && <Icon name="Check" size={12} className="text-white" strokeWidth={3} />}
+                          </div>
+                          <input type="checkbox" className="hidden" checked={isSheetChecked} onChange={(e) => handleSheetChange(sheet, e.target.checked)} />
+                          <span className="text-sm text-slate-700">{sheet}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
+                  <Icon name="File" size={48} className="mb-4 text-slate-200" />
+                  <p className="text-sm">请先在左侧选择文件</p>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-end space-x-3 bg-slate-50 shrink-0 rounded-b-xl">
+            <button 
+              onClick={() => setIsFileSelectModalOpen(false)}
+              className="px-6 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              取消
+            </button>
+            <button 
+              onClick={handleConfirm}
+              className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
+            >
+              确定
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  };
+
   if (showResultView) {
-    return <RebiddingCheckResultView onBack={() => setShowResultView(false)} onReturnToList={onReturnToList || onBack} mode={mode} />;
+    return <RebiddingCheckResultView onBack={() => setShowResultView(false)} onReturnToList={onReturnToList || onBack} mode={mode} checkSettings={checkSettings} />;
   }
 
   return (
@@ -1319,6 +1719,9 @@ const NewRebiddingProjectView: React.FC<NewRebiddingProjectViewProps> = ({ onBac
         </div>,
         document.body
       )}
+      
+      {/* 渲染文件选择弹窗 */}
+      {renderFileSelectModal()}
     </div>
   );
 };

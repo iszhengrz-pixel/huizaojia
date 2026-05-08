@@ -6,6 +6,7 @@ interface RebiddingCheckResultViewProps {
   onBack: () => void;
   onReturnToList?: () => void; // 新增属性，用于跨级返回列表页
   mode?: 'new' | 'edit';
+  checkSettings?: any;
 }
 
 interface UnitCompareItem {
@@ -53,7 +54,7 @@ interface FilePreviewData {
   activeTab: string;
 }
 
-const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onBack, onReturnToList, mode = 'new' }) => {
+const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onBack, onReturnToList, mode = 'new', checkSettings }) => {
   const projectTitle = '宁波住宅项目-清标检查';
   const [currentStep, setCurrentStep] = useState<2 | 3>(2);
   const [maxReachedStep, setMaxReachedStep] = useState<number>(2);
@@ -61,6 +62,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
   const [activeComplianceTab, setActiveComplianceTab] = useState('wrong');
   const [activeArithmeticTab, setActiveArithmeticTab] = useState('emptyZero');
   const [activeCollusionTab, setActiveCollusionTab] = useState('attr');
+  const [activeSameListGroupTab, setActiveSameListGroupTab] = useState('default'); // 新增用于相同清单的对比组 tab
   const [showOnlyProblem, setShowOnlyProblem] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showHeaderSettingsModal, setShowHeaderSettingsModal] = useState(false);
@@ -254,6 +256,15 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
     { id: 'attr', label: '电子文件属性信息雷同' },
     { id: 'samePrice', label: '单价相同/相似检查' },
     { id: 'typos', label: '规律性错误检查' }
+  ];
+
+  // 相同清单的对比组（从 checkSettings 提取，过滤掉名称或页签为空的，如果不存在则提供默认兜底）
+  const sameListGroups = (checkSettings?.compliance?.sameListGroups || [])
+    .filter((g: any) => g.name && g.name.trim() !== '' && g.sheets && g.sheets.length > 0);
+
+  // 如果过滤后为空，则使用默认的
+  const finalSameListGroups = sameListGroups.length > 0 ? sameListGroups : [
+    { id: 'default', name: '默认对比组', sheets: ['全部文件-全部页签'] }
   ];
 
   // 模拟检查结果数据
@@ -895,7 +906,6 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
               )}
             </div>
 
-            {/* Content Toolbar */}
             {activeTab === 'summary' && (
               <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-white">
                 <div className="text-sm text-slate-500 flex items-center">
@@ -1011,6 +1021,23 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                       <span>导出报表</span>
                     </button>
                   </div>
+                  {activeComplianceTab === 'sameList' && finalSameListGroups.length > 0 && (
+                    <div className="flex items-center space-x-2 overflow-x-auto">
+                      {finalSameListGroups.map((group: any) => (
+                        <button
+                          key={group.id}
+                          onClick={() => setActiveSameListGroupTab(group.id)}
+                          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors shrink-0 ${
+                            activeSameListGroupTab === group.id
+                              ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                              : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {group.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   
                   {/* 符合性检查表格 */}
                   <table className="w-full text-center border-collapse border border-slate-200">
