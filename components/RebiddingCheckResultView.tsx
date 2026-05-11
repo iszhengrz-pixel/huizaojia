@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { renderAsync } from 'docx-preview';
 import Icon from './Icon';
 
 interface RebiddingCheckResultViewProps {
@@ -104,6 +105,33 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
   const [showSummaryHeaderSettingsModal, setShowSummaryHeaderSettingsModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportSelection, setExportSelection] = useState<string[]>(['summary', 'compare', 'unit']);
+  
+  // 导出报告预览相关状态
+  const [showReportPreviewModal, setShowReportPreviewModal] = useState(false);
+  const [reportContent, setReportContent] = useState('');
+  const [reportHtml, setReportHtml] = useState('');
+  const [isTemplateStyleLoading, setIsTemplateStyleLoading] = useState(false);
+  const [showTemplateSelectBubble, setShowTemplateSelectBubble] = useState(false);
+  const [selectedReportTemplate, setSelectedReportTemplate] = useState('default');
+  const [draftReportTemplate, setDraftReportTemplate] = useState('default');
+  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
+  const [showSwitchTemplateConfirm, setShowSwitchTemplateConfirm] = useState(false);
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+  const reportEditorRef = useRef<HTMLDivElement | null>(null);
+  const templateProbeRef = useRef<HTMLDivElement | null>(null);
+  const REPORT_TEMPLATE_OPTIONS = [
+    { id: 'default', label: '默认模板' },
+    { id: 'jianfa', label: '建发地产模板' },
+    { id: 'lvcheng', label: '绿城地产模板' },
+    { id: 'zhaoshang', label: '招商地产模板' }
+  ];
+  const templateDocxUrlMap: Record<string, string> = {
+    default: new URL('../AIBAOGAO.docx', import.meta.url).href,
+    jianfa: new URL('../AIBAOGAO.docx', import.meta.url).href,
+    lvcheng: new URL('../AIBAOGAO.docx', import.meta.url).href,
+    zhaoshang: new URL('../AIBAOGAO.docx', import.meta.url).href
+  };
+  const templateDocxUrl = templateDocxUrlMap[selectedReportTemplate];
 
   const toggleExportSelection = (id: string) => {
     setExportSelection(prev => 
@@ -118,11 +146,288 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
       prev.includes(header) ? prev.filter(h => h !== header) : [...prev, header]
     );
   };
-  
+
   const toggleSummaryHeader = (header: string) => {
-    setSelectedSummaryHeaders(prev => 
+    setSelectedSummaryHeaders(prev =>
       prev.includes(header) ? prev.filter(h => h !== header) : [...prev, header]
     );
+  };
+  
+  const generateReportTemplate = () => {
+    const d = new Date();
+    const dateStr = `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    
+    let content = `AI清标报告
+
+项目名称：宁波住宅项目
+招标人：
+开标日期：2026年05月11日
+清标日期：${dateStr}
+
+汇能优算科技（浙江）有限公司
+中国·宁波
+
+清 标 报 告 目 录
+1. 项目概况
+2. 投标文件符合性与响应性检查结果
+3. 算术性错误复核结果与修正建议
+4. 报价合理性与不平衡报价分析
+5. 商务标相似度检查结果
+6. 清标结论与风险建议
+
+1.项目基本信息
+项目名称：宁波住宅项目
+建设地点：
+招标方式：
+招标范围：
+最高投标限价（招标控制价）：1,000,000.00
+工期要求：
+有效投标单位数量：5
+
+2.投标文件符合性与响应性检查结果
+`;
+
+    // 简单提取几个表格的数据作为文本展示
+    content += `2.1 错项、增项、漏项检查结果\n`;
+    MOCK_RESULTS.forEach((r, i) => {
+      content += `${i+1}. 投标人: ${r.bidder} | 错项: ${r.compliance.wrong==='error'?'异常':'正常'} | 增项: ${r.compliance.added==='error'?'异常':'正常'} | 漏项: ${r.compliance.missing==='error'?'异常':'正常'}\n`;
+    });
+
+    content += `\n2.2 相同清单/材料价格一致性检查\n`;
+    MOCK_RESULTS.forEach((r, i) => {
+      content += `${i+1}. 投标人: ${r.bidder} | 清单价格: ${r.compliance.sameList==='error'?'异常':'正常'} | 材料价格: ${r.compliance.sameMaterial==='error'?'异常':'正常'}\n`;
+    });
+
+    content += `
+分析说明：
+投标人 XXX、XXX 等 XX 家单位，投标清单的项目编码、项目名称、项目特征、计量单位、工程量与招标清单完全一致，无缺项、漏项、增项、错项问题，符合招标文件实质性要求；
+投标人 XXX 存在招标清单缺项 XX 项、擅自增项 XX 项，项目特征描述与招标清单不符 XX 项，不符合招标文件“不得修改招标清单实质性内容”的要求；
+投标人 XXX 存在 XX 项清单工程量擅自修改，与招标清单给定工程量不一致，偏离幅度 XX%，涉嫌不响应招标文件实质性要求。
+
+3.算术性错误复核结果与修正建议
+`;
+    MOCK_RESULTS.forEach((r, i) => {
+      content += `${i+1}. 投标人: ${r.bidder} | 单价为零/空/负数: ${r.arithmetic.emptyZero==='error'?'异常':'正常'} | 合价检查: ${r.arithmetic.total==='warning'||r.arithmetic.total==='error'?'异常':'正常'}\n`;
+    });
+
+    content += `
+分析说明：
+投标人 XXX、XXX 等 XX 家单位，投标报价无算术性计算错误，单价 × 工程量 = 合价、各分项合价汇总 = 总价计算逻辑准确无误；
+投标人 XXX 存在算术性错误 XX 处，其中合价计算错误 XX 处，总价汇总偏差 XX 元，偏差幅度 XX%；单价遗漏 / 为负 / 为零 XX 项，涉及金额 XX 元；
+投标人 XXX 存在小数点进位错误、税率计取错误 XX 处，导致总价与分项汇总金额不符，偏差幅度 XX%。
+
+4.报价合理性与不平衡报价分析
+分析说明：
+投标人 XXX、XXX 等 XX 家单位，清单综合单价无显著异常，整体报价水平合理，未发现严重不平衡报价情形；
+投标人 XXX 存在 XX 项清单综合单价异常偏高，最高偏离基准值 XX%，XX 项清单综合单价异常偏低，最低偏离基准值 XX%，超出招标文件约定的合理偏差范围，构成严重不平衡报价；
+投标人 XXX 主要分部分项工程单价与市场公允价格存在显著偏离，其中 XX 项清单单价低于成本价嫌疑，提请评标委员会重点关注。
+
+5.商务标相似度检查结果
+分析说明：
+投标人XXX、XXX 等 XX 家单位，文本相似度均低于招标文件约定的雷同阈值，无围标串标嫌疑情形；
+投标人 XXX 与投标人 XXX 的技术标文本相似度达 XX%，商务标报价呈规律性差异，涉嫌串通投标，提请评标委员会按招标文件及相关法律法规审议判定。
+
+6.清标结论与风险建议
+经系统核查与人工复核，总体结论如下：
+1.本次清标共核查投标文件 5 份，其中 XX 份投标文件未发现重大偏差，清单响应性、计价合规性符合招标文件实质性要求；
+2.XX 份投标文件存在细微偏差 / 算术性错误 / 报价异常等问题，均不构成对招标文件的实质性偏离，具体问题详见分项核查结论及问题明细；
+3.XX 份投标文件存在重大偏差嫌疑，涉嫌不符合招标文件实质性要求，具体情况详见分项核查结论，提请评标委员会重点审议判定。
+`;
+
+    return content;
+  };
+
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const buildStyledReportHtml = (
+    text: string,
+    styles?: {
+      title: string;
+      heading: string;
+      body: string;
+    }
+  ) => {
+    const titleStyle = styles?.title || 'font-size: 24px; font-weight: 700; text-align: center; color: #333333; line-height: 1.6; margin: 0 0 24px;';
+    const headingStyle = styles?.heading || 'font-size: 18px; font-weight: 700; color: #333333; line-height: 1.6; margin: 24px 0 12px;';
+    const bodyStyle = styles?.body || 'font-size: 14px; font-weight: 400; color: #333333; line-height: 1.9; margin: 0 0 10px; text-align: justify;';
+
+    const lines = text.split('\n');
+    const html: string[] = [];
+
+    lines.forEach((rawLine, index) => {
+      const line = rawLine.trim();
+      if (!line) {
+        html.push('<p style="height: 12px; margin: 0;"></p>');
+        return;
+      }
+
+      const escaped = escapeHtml(line);
+
+      if (index === 0) {
+        html.push(`<p style="${titleStyle}">${escaped}</p>`);
+        return;
+      }
+
+      if (/^\d+(\.\d+)*[.．]/.test(line) || /^分析说明[:：]?$/.test(line) || /^经系统核查与人工复核/.test(line)) {
+        html.push(`<p style="${headingStyle}">${escaped}</p>`);
+        return;
+      }
+
+      html.push(`<p style="${bodyStyle}">${escaped}</p>`);
+    });
+
+    return html.join('');
+  };
+
+  useEffect(() => {
+    if (!showReportPreviewModal || !templateProbeRef.current) return;
+
+    let cancelled = false;
+
+    const loadTemplateStyles = async () => {
+      setIsTemplateStyleLoading(true);
+      try {
+        const response = await fetch(templateDocxUrl);
+        const buffer = await response.arrayBuffer();
+        if (!templateProbeRef.current || cancelled) return;
+
+        templateProbeRef.current.innerHTML = '';
+        await renderAsync(buffer, templateProbeRef.current);
+        if (cancelled || !templateProbeRef.current) return;
+
+        const paragraphs = Array.from(templateProbeRef.current.querySelectorAll('p')) as HTMLParagraphElement[];
+        const meaningfulParagraphs = paragraphs.filter((p) => (p.textContent || '').trim() !== '');
+        const titleNode = meaningfulParagraphs[0];
+        const bodyNode = meaningfulParagraphs[1] || meaningfulParagraphs[0];
+
+        const getStyleText = (node: HTMLElement | undefined, fallback: string) => {
+          if (!node) return fallback;
+          const computed = window.getComputedStyle(node);
+          return [
+            `font-size: ${computed.fontSize}`,
+            `font-weight: ${computed.fontWeight}`,
+            `font-family: ${computed.fontFamily}`,
+            `line-height: ${computed.lineHeight}`,
+            `letter-spacing: ${computed.letterSpacing}`,
+            `text-align: ${computed.textAlign}`,
+            `color: ${computed.color}`,
+            `margin: ${computed.marginTop} 0 ${computed.marginBottom}`,
+            'white-space: pre-wrap'
+          ].join('; ');
+        };
+
+        const titleStyle = getStyleText(
+          titleNode,
+          'font-size: 24px; font-weight: 700; text-align: center; color: #333333; line-height: 1.6; margin: 0 0 24px; white-space: pre-wrap'
+        );
+        const bodyStyle = getStyleText(
+          bodyNode,
+          'font-size: 14px; font-weight: 400; color: #333333; line-height: 1.9; margin: 0 0 10px; text-align: justify; white-space: pre-wrap'
+        );
+        const headingStyle = [
+          bodyStyle,
+          'font-size: 18px',
+          'font-weight: 700',
+          'margin: 24px 0 12px',
+          'text-align: left'
+        ].join('; ');
+
+        const templateHtml = templateProbeRef.current.innerHTML;
+        if (templateHtml && templateHtml.trim() !== '') {
+          setReportHtml(templateHtml);
+        } else {
+          setReportHtml(
+            buildStyledReportHtml(reportContent, {
+              title: titleStyle,
+              heading: headingStyle,
+              body: bodyStyle
+            })
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setReportHtml(buildStyledReportHtml(reportContent));
+        }
+      } finally {
+        if (!cancelled) {
+          setIsTemplateStyleLoading(false);
+        }
+      }
+    };
+
+    loadTemplateStyles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showReportPreviewModal, reportContent, templateDocxUrl]);
+
+  const openReportPreview = () => {
+    const nextContent = generateReportTemplate();
+    setReportContent(nextContent);
+    setReportHtml(buildStyledReportHtml(nextContent));
+    setShowExportModal(false);
+    setShowTemplateSelectBubble(false);
+    setIsTemplateDropdownOpen(false);
+    setShowReportPreviewModal(true);
+  };
+
+  const handleExportReport = () => {
+    setDraftReportTemplate(selectedReportTemplate);
+    setShowTemplateSelectBubble(true);
+  };
+
+  const handleConfirmTemplateSelection = () => {
+    setSelectedReportTemplate(draftReportTemplate);
+    openReportPreview();
+  };
+
+  const handleSwitchReportTemplate = (templateId: string) => {
+    if (templateId === selectedReportTemplate) {
+      setIsTemplateDropdownOpen(false);
+      return;
+    }
+
+    setPendingTemplateId(templateId);
+    setShowSwitchTemplateConfirm(true);
+    setIsTemplateDropdownOpen(false);
+  };
+
+  const confirmSwitchTemplate = () => {
+    if (!pendingTemplateId) return;
+
+    setSelectedReportTemplate(pendingTemplateId);
+    setIsTemplateDropdownOpen(false);
+    setShowReportPreviewModal(false);
+    setShowSwitchTemplateConfirm(false);
+    setPendingTemplateId(null);
+    setTimeout(() => {
+      openReportPreview();
+    }, 0);
+  };
+
+  const downloadWordDocument = () => {
+    // 简单的 HTML 转换为 Word doc 的方式
+    const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>清标报告</title></head><body>";
+    const footer = "</body></html>";
+    const htmlContent = reportEditorRef.current?.innerHTML || reportHtml;
+    const sourceHTML = header + htmlContent + footer;
+    
+    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
+    const fileDownload = document.createElement("a");
+    document.body.appendChild(fileDownload);
+    fileDownload.href = source;
+    fileDownload.download = 'AI清标报告.doc';
+    fileDownload.click();
+    document.body.removeChild(fileDownload);
+    
+    setShowReportPreviewModal(false);
   };
 
   const [taxAmountType, setTaxAmountType] = useState<'tax' | 'noTax'>('noTax');
@@ -802,7 +1107,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                 setActiveTab('summaryCompare');
                 setMaxReachedStep(Math.max(maxReachedStep, 3));
               } else {
-                alert('导出功能开发中');
+                handleExportReport();
               }
             }} 
             className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
@@ -898,7 +1203,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                     <Icon name="Sparkles" size={14} />
                     <span>AI整体分析</span>
                   </button>
-                  <button onClick={() => setShowExportModal(true)} className="px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
+                  <button onClick={handleExportReport} className="px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
                     <Icon name="Download" size={14} />
                     <span>导出报表</span>
                   </button>
@@ -1016,7 +1321,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         </button>
                       ))}
                     </div>
-                    <button className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
+                    <button onClick={handleExportReport} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
                       <Icon name="Download" size={14} />
                       <span>导出报表</span>
                     </button>
@@ -1106,7 +1411,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         </button>
                       ))}
                     </div>
-                    <button className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
+                    <button onClick={handleExportReport} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
                       <Icon name="Download" size={14} />
                       <span>导出报表</span>
                     </button>
@@ -1171,7 +1476,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         <Icon name="Settings" size={14} />
                         <span>参数设置</span>
                       </button>
-                      <button className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
+                      <button onClick={handleExportReport} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
                         <Icon name="Download" size={14} />
                         <span>导出报表</span>
                       </button>
@@ -1247,7 +1552,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         </button>
                       ))}
                     </div>
-                    <button className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
+                    <button onClick={handleExportReport} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
                       <Icon name="Download" size={14} />
                       <span>导出报表</span>
                     </button>
@@ -2684,6 +2989,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                 <Icon name="X" size={20} />
               </button>
             </div>
+
             
             <div className="p-6">
               <div className="text-sm text-slate-600 mb-6">设置基准的超出比例阈值，超出部分将被认定为不平衡报价</div>
@@ -3157,6 +3463,206 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
         </div>,
         document.body
       )}
+
+      {/* Export Report Preview Modal */}
+      {showReportPreviewModal && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white w-[1100px] h-[92vh] rounded-xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800">报告预览与编辑</h3>
+                  <p className="mt-2 text-sm text-slate-500">
+                    系统已基于您的模板和清标数据生成了报告内容。您可以在下方直接修改内容，修改后点击导出即可生成 Word 文档。
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setShowReportPreviewModal(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
+                >
+                  <Icon name="X" size={20} />
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 px-6 py-5 overflow-hidden flex flex-col bg-white">
+              <style>{`
+                .report-editor-host .docx-wrapper {
+                  background: transparent !important;
+                  padding: 0 !important;
+                }
+                .report-editor-host .docx {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  margin: 0 0 24px 0 !important;
+                  width: auto !important;
+                  min-height: auto !important;
+                  padding: 0 !important;
+                }
+                .report-editor-host .docx section,
+                .report-editor-host section.docx {
+                  background: transparent !important;
+                  box-shadow: none !important;
+                  margin: 0 0 24px 0 !important;
+                }
+                .report-editor-host table {
+                  border-collapse: collapse !important;
+                }
+              `}</style>
+              <div className="report-editor-host flex-1 overflow-auto bg-white">
+                <div
+                  ref={reportEditorRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={(e) => {
+                    setReportHtml((e.currentTarget as HTMLDivElement).innerHTML);
+                    setReportContent((e.currentTarget as HTMLDivElement).innerText);
+                  }}
+                  className="min-h-full w-full outline-none text-slate-700"
+                  style={{ fontFamily: '"Microsoft YaHei", "PingFang SC", Inter, sans-serif' }}
+                  dangerouslySetInnerHTML={{ __html: reportHtml }}
+                />
+              </div>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white shrink-0 rounded-b-xl">
+              <div className="relative">
+                <button
+                  onClick={() => setIsTemplateDropdownOpen(prev => !prev)}
+                  className="min-w-[180px] px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:border-blue-400 hover:bg-slate-50 transition-colors flex items-center justify-between space-x-3"
+                >
+                  <span>{REPORT_TEMPLATE_OPTIONS.find(item => item.id === selectedReportTemplate)?.label || '默认模板'}</span>
+                  <Icon name="ChevronDown" size={16} className={`text-slate-400 transition-transform ${isTemplateDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isTemplateDropdownOpen && (
+                  <div className="absolute left-0 bottom-full mb-2 w-[220px] bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-10">
+                    {REPORT_TEMPLATE_OPTIONS.map(option => (
+                      <button
+                        key={option.id}
+                        onClick={() => handleSwitchReportTemplate(option.id)}
+                        className={`w-full px-4 py-3 text-sm text-left transition-colors ${
+                          option.id === selectedReportTemplate
+                            ? 'bg-blue-50 text-blue-600 font-medium'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center space-x-3">
+                <button 
+                  onClick={() => {
+                    setShowReportPreviewModal(false);
+                    setIsTemplateDropdownOpen(false);
+                  }}
+                  className="px-6 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  取消
+                </button>
+                <button 
+                  onClick={downloadWordDocument}
+                  className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20 flex items-center space-x-2"
+                >
+                  <Icon name="Download" size={16} />
+                  <span>确认导出 (Word)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {showSwitchTemplateConfirm && createPortal(
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl w-[400px] overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <h3 className="text-base font-bold text-slate-800">切换模板提醒</h3>
+              <button 
+                onClick={() => {
+                  setShowSwitchTemplateConfirm(false);
+                  setPendingTemplateId(null);
+                }} 
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <Icon name="X" size={20} />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-slate-600 text-center">
+                确定要切换报告模板吗？<br />当前正在编辑的报告内容将会丢失。
+              </p>
+            </div>
+            <div className="flex items-center justify-end px-6 py-4 border-t border-slate-200 bg-slate-50 space-x-3">
+              <button 
+                onClick={() => {
+                  setShowSwitchTemplateConfirm(false);
+                  setPendingTemplateId(null);
+                }} 
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+              >
+                取消
+              </button>
+              <button 
+                onClick={confirmSwitchTemplate} 
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors shadow-sm"
+              >
+                确定切换
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      {showTemplateSelectBubble && createPortal(
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/20">
+          <div className="w-[420px] bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <div className="text-base font-bold text-slate-800">选择报告模板</div>
+              <div className="mt-1 text-sm text-slate-500">请选择要套用的报告模板，确认后进入编辑预览弹窗。</div>
+            </div>
+            <div className="p-4 space-y-2">
+              {REPORT_TEMPLATE_OPTIONS.map(option => (
+                <label
+                  key={option.id}
+                  className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    draftReportTemplate === option.id
+                      ? 'border-blue-600 bg-blue-50/40'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="report-template"
+                    checked={draftReportTemplate === option.id}
+                    onChange={() => setDraftReportTemplate(option.id)}
+                    className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
+                  />
+                  <span className={`text-sm ${draftReportTemplate === option.id ? 'text-blue-600 font-medium' : 'text-slate-700'}`}>{option.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end space-x-3">
+              <button
+                onClick={() => setShowTemplateSelectBubble(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmTemplateSelection}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+      <div ref={templateProbeRef} className="fixed left-[-99999px] top-0 h-0 w-0 overflow-hidden opacity-0 pointer-events-none" />
 
     </div>
   );
