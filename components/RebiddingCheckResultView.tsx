@@ -454,6 +454,97 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
     setShowExportTypeBubble(true);
   };
 
+  const downloadCsvFile = (filename: string, rows: string[][]) => {
+    const escape = (value: string) => {
+      const s = `${value ?? ''}`;
+      if (/[",\n]/.test(s)) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    };
+
+    const csv = '\uFEFF' + rows.map((r) => r.map(escape).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const getStatusText = (status: string) => {
+    if (status === 'error') return '异常';
+    if (status === 'warning') return '预警';
+    return '正常';
+  };
+
+  const handleExportSheets = (sheetType: 'summary' | 'compliance' | 'arithmetic' | 'unbalanced' | 'collusion') => {
+    const now = new Date();
+    const dateTag = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+
+    if (sheetType === 'compliance') {
+      const header = ['投标单位', ...COMPLIANCE_TABS.map((t) => t.label)];
+      const rows = [
+        header,
+        ...MOCK_RESULTS.map((r: any) => [
+          r.bidder,
+          ...COMPLIANCE_TABS.map((t) => getStatusText(r.compliance?.[t.id]))
+        ])
+      ];
+      downloadCsvFile(`符合性检查报表_${dateTag}.csv`, rows);
+      return;
+    }
+
+    if (sheetType === 'arithmetic') {
+      const header = ['投标单位', ...ARITHMETIC_TABS.map((t) => t.label)];
+      const rows = [
+        header,
+        ...MOCK_RESULTS.map((r: any) => [
+          r.bidder,
+          ...ARITHMETIC_TABS.map((t) => getStatusText(r.arithmetic?.[t.id]))
+        ])
+      ];
+      downloadCsvFile(`算术性错误检查报表_${dateTag}.csv`, rows);
+      return;
+    }
+
+    if (sheetType === 'unbalanced') {
+      const header = ['投标单位', '不平衡报价检查'];
+      const rows = [
+        header,
+        ...MOCK_RESULTS.map((r: any) => [
+          r.bidder,
+          getStatusText(r.collusion?.unbalanced)
+        ])
+      ];
+      downloadCsvFile(`不平衡报价检查报表_${dateTag}.csv`, rows);
+      return;
+    }
+
+    if (sheetType === 'collusion') {
+      const header = ['投标单位', ...COLLUSION_TABS.map((t) => t.label)];
+      const rows = [
+        header,
+        ...MOCK_RESULTS.map((r: any) => [
+          r.bidder,
+          ...COLLUSION_TABS.map((t) => getStatusText(r.collusion?.[t.id]))
+        ])
+      ];
+      downloadCsvFile(`串标检查报表_${dateTag}.csv`, rows);
+      return;
+    }
+
+    const header = ['投标单位', '问题数量'];
+    const rows = [
+      header,
+      ...MOCK_RESULTS.map((r: any) => [r.bidder, String(r.problemCount ?? 0)])
+    ];
+    downloadCsvFile(`清标检查汇总报表_${dateTag}.csv`, rows);
+  };
+
   const handleConfirmExportType = () => {
     setShowExportTypeBubble(false);
     setShowReportPreviewModal(true);
@@ -1255,7 +1346,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                     <Icon name="Sparkles" size={14} />
                     <span>AI整体分析</span>
                   </button>
-                  <button onClick={handleExportReport} className="px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
+                  <button onClick={() => handleExportSheets('summary')} className="px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
                     <Icon name="Download" size={14} />
                     <span>导出报表</span>
                   </button>
@@ -1373,7 +1464,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         </button>
                       ))}
                     </div>
-                    <button onClick={handleExportReport} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
+                    <button onClick={() => handleExportSheets('compliance')} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
                       <Icon name="Download" size={14} />
                       <span>导出报表</span>
                     </button>
@@ -1463,7 +1554,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         </button>
                       ))}
                     </div>
-                    <button onClick={handleExportReport} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
+                    <button onClick={() => handleExportSheets('arithmetic')} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
                       <Icon name="Download" size={14} />
                       <span>导出报表</span>
                     </button>
@@ -1528,7 +1619,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         <Icon name="Settings" size={14} />
                         <span>参数设置</span>
                       </button>
-                      <button onClick={handleExportReport} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
+                      <button onClick={() => handleExportSheets('unbalanced')} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1">
                         <Icon name="Download" size={14} />
                         <span>导出报表</span>
                       </button>
@@ -1604,7 +1695,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
                         </button>
                       ))}
                     </div>
-                    <button onClick={handleExportReport} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
+                    <button onClick={() => handleExportSheets('collusion')} className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors flex items-center space-x-1 mb-2">
                       <Icon name="Download" size={14} />
                       <span>导出报表</span>
                     </button>
