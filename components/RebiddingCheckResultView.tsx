@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { renderAsync } from 'docx-preview';
 import Icon from './Icon';
@@ -111,27 +111,101 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
   const [reportContent, setReportContent] = useState('');
   const [reportHtml, setReportHtml] = useState('');
   const [isTemplateStyleLoading, setIsTemplateStyleLoading] = useState(false);
-  const [showTemplateSelectBubble, setShowTemplateSelectBubble] = useState(false);
-  const [selectedReportTemplate, setSelectedReportTemplate] = useState('default');
-  const [draftReportTemplate, setDraftReportTemplate] = useState('default');
-  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
-  const [showSwitchTemplateConfirm, setShowSwitchTemplateConfirm] = useState(false);
-  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
-  const reportEditorRef = useRef<HTMLDivElement | null>(null);
-  const templateProbeRef = useRef<HTMLDivElement | null>(null);
+  const [showExportTypeBubble, setShowExportTypeBubble] = useState(false);
+  const [exportType, setExportType] = useState<'checkItems' | 'templates'>('checkItems');
+  const [selectedExportCheckItems, setSelectedExportCheckItems] = useState<string[]>(['aiReport']);
+  const [activePreviewKey, setActivePreviewKey] = useState<string>('aiReport');
+  const [exportExpandedKeys, setExportExpandedKeys] = useState<string[]>(['compliance', 'arithmetic', 'unbalanced', 'collusion', 'compareTables']);
+
+  const CHECK_ITEM_TREE = useMemo(() => {
+    const tree: any[] = [];
+    
+    tree.push({
+      key: 'aiReport',
+      label: 'AI清标报告',
+      children: []
+    });
+
+    if (checkSettings) {
+      if (checkSettings.compliance) {
+        const children = [];
+        if (checkSettings.compliance.wrongItem) children.push({ key: 'wrongItem', label: '错项检查', count: 0 });
+        if (checkSettings.compliance.addedItem) children.push({ key: 'addedItem', label: '增项检查', count: 0 });
+        if (checkSettings.compliance.missingItem) children.push({ key: 'missingItem', label: '漏项检查', count: 0 });
+        if (checkSettings.compliance.sameListPrice) children.push({ key: 'sameListPrice', label: '同清单不同价检查', count: 0 });
+        if (checkSettings.compliance.sameMaterialPrice) children.push({ key: 'sameMaterialPrice', label: '同材料不同价检查', count: 0 });
+        if (checkSettings.compliance.nonCompetitiveChanged) children.push({ key: 'nonCompetitiveChanged', label: '不可竞争费检查', count: 0 });
+        if (checkSettings.compliance.exceedLimit) children.push({ key: 'exceedLimit', label: '超出限价检查', count: 0 });
+        if (children.length > 0) {
+          tree.push({ key: 'compliance', label: '符合性检查明细', children });
+        }
+      }
+      
+      if (checkSettings.arithmetic) {
+        const children = [];
+        if (checkSettings.arithmetic.emptyZeroNegative) children.push({ key: 'emptyZeroNegative', label: '清单工程量为空/0/负数', count: 0 });
+        if (checkSettings.arithmetic.totalPrice) children.push({ key: 'totalPrice', label: '合价计算错误', count: 0 });
+        if (children.length > 0) {
+          tree.push({ key: 'arithmetic', label: '算术性错误检查明细', children });
+        }
+      }
+
+      if (checkSettings.unbalanced && checkSettings.unbalanced.enabled) {
+        tree.push({ 
+          key: 'unbalanced', 
+          label: '不平衡报价检查明细', 
+          children: [
+            { key: 'unbalancedItem', label: '不平衡报价明细', count: 0 }
+          ] 
+        });
+      }
+
+      if (checkSettings.collusion) {
+        const children = [];
+        if (checkSettings.collusion.sameSaver) children.push({ key: 'sameSaver', label: '不同投标人文件保存人相同', count: 0 });
+        if (checkSettings.collusion.sameUnitPrice) children.push({ key: 'sameUnitPrice', label: '同清单不同投标人单价相同', count: 0 });
+        if (checkSettings.collusion.sameRatio) children.push({ key: 'sameRatio', label: '投标总价呈规律性比例', count: 0 });
+        if (checkSettings.collusion.sameDiff) children.push({ key: 'sameDiff', label: '投标总价呈规律性差额', count: 0 });
+        if (checkSettings.collusion.regularError) children.push({ key: 'regularError', label: '不同投标人算术性错误呈规律性', count: 0 });
+        if (children.length > 0) {
+          tree.push({ key: 'collusion', label: '串标检查明细', children });
+        }
+      }
+    }
+
+    tree.push({
+      key: 'compareTables',
+      label: '对比表',
+      children: [
+        { key: 'summaryCompare', label: '汇总对比表', count: 0 },
+        { key: 'detailCompare', label: '清标对比表', count: 0 },
+        { key: 'unitCompare', label: '单方对比表', count: 0 }
+      ]
+    });
+
+    return tree;
+  }, [checkSettings]);
+
   const REPORT_TEMPLATE_OPTIONS = [
-    { id: 'default', label: '默认模板' },
-    { id: 'jianfa', label: '建发地产模板' },
-    { id: 'lvcheng', label: '绿城地产模板' },
-    { id: 'zhaoshang', label: '招商地产模板' }
+    { id: 'lvcheng', label: '绿城地产报告模板' },
+    { id: 'zhaoshang', label: '招商地产报告模板' },
+    { id: 'jianfa', label: '建发地产报告模板' }
   ];
+  
+  const [selectedReportTemplates, setSelectedReportTemplates] = useState<string[]>(['lvcheng']);
+
+
   const templateDocxUrlMap: Record<string, string> = {
     default: new URL('../AIBAOGAO.docx', import.meta.url).href,
     jianfa: new URL('../AIBAOGAO.docx', import.meta.url).href,
     lvcheng: new URL('../AIBAOGAO.docx', import.meta.url).href,
     zhaoshang: new URL('../AIBAOGAO.docx', import.meta.url).href
   };
-  const templateDocxUrl = templateDocxUrlMap[selectedReportTemplate];
+
+  const reportEditorRef = useRef<HTMLDivElement | null>(null);
+  const templateProbeRef = useRef<HTMLDivElement | null>(null);
+
+  const templateDocxUrl = templateDocxUrlMap[selectedReportTemplates[0] || 'default'];
 
   const toggleExportSelection = (id: string) => {
     setExportSelection(prev => 
@@ -298,7 +372,7 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
         if (!templateProbeRef.current || cancelled) return;
 
         templateProbeRef.current.innerHTML = '';
-        await renderAsync(buffer, templateProbeRef.current);
+        await renderAsync(buffer, templateProbeRef.current, undefined, { inWrapper: false, ignoreWidth: true, ignoreHeight: true });
         if (cancelled || !templateProbeRef.current) return;
 
         const paragraphs = Array.from(templateProbeRef.current.querySelectorAll('p')) as HTMLParagraphElement[];
@@ -373,44 +447,22 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
     setReportContent(nextContent);
     setReportHtml(buildStyledReportHtml(nextContent));
     setShowExportModal(false);
-    setShowTemplateSelectBubble(false);
-    setIsTemplateDropdownOpen(false);
     setShowReportPreviewModal(true);
   };
 
   const handleExportReport = () => {
-    setDraftReportTemplate(selectedReportTemplate);
-    setShowTemplateSelectBubble(true);
+    setShowExportTypeBubble(true);
   };
 
-  const handleConfirmTemplateSelection = () => {
-    setSelectedReportTemplate(draftReportTemplate);
-    openReportPreview();
-  };
-
-  const handleSwitchReportTemplate = (templateId: string) => {
-    if (templateId === selectedReportTemplate) {
-      setIsTemplateDropdownOpen(false);
-      return;
+  const handleConfirmExportType = () => {
+    setShowExportTypeBubble(false);
+    setShowReportPreviewModal(true);
+    // 当弹窗打开时，如果是按模板导出，确保右侧预览停留在第一个选中的模板（或默认的绿城）
+    if (exportType === 'templates') {
+      setActivePreviewKey(selectedReportTemplates.length > 0 ? selectedReportTemplates[0] : 'lvcheng');
     }
-
-    setPendingTemplateId(templateId);
-    setShowSwitchTemplateConfirm(true);
-    setIsTemplateDropdownOpen(false);
   };
 
-  const confirmSwitchTemplate = () => {
-    if (!pendingTemplateId) return;
-
-    setSelectedReportTemplate(pendingTemplateId);
-    setIsTemplateDropdownOpen(false);
-    setShowReportPreviewModal(false);
-    setShowSwitchTemplateConfirm(false);
-    setPendingTemplateId(null);
-    setTimeout(() => {
-      openReportPreview();
-    }, 0);
-  };
 
   const downloadWordDocument = () => {
     // 简单的 HTML 转换为 Word doc 的方式
@@ -3464,196 +3516,447 @@ const RebiddingCheckResultView: React.FC<RebiddingCheckResultViewProps> = ({ onB
         document.body
       )}
 
-      {/* Export Report Preview Modal */}
+      {/* 导出质检报告预览弹窗 */}
       {showReportPreviewModal && createPortal(
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
-          <div className="bg-white w-[1100px] h-[92vh] rounded-xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 shrink-0">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">报告预览与编辑</h3>
-                  <p className="mt-2 text-sm text-slate-500">
-                    系统已基于您的模板和清标数据生成了报告内容。您可以在下方直接修改内容，修改后点击导出即可生成 Word 文档。
-                  </p>
-                </div>
-                <button 
-                  onClick={() => setShowReportPreviewModal(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
-                >
-                  <Icon name="X" size={20} />
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex-1 px-6 py-5 overflow-hidden flex flex-col bg-white">
-              <style>{`
-                .report-editor-host .docx-wrapper {
-                  background: transparent !important;
-                  padding: 0 !important;
-                }
-                .report-editor-host .docx {
-                  background: transparent !important;
-                  box-shadow: none !important;
-                  margin: 0 0 24px 0 !important;
-                  width: auto !important;
-                  min-height: auto !important;
-                  padding: 0 !important;
-                }
-                .report-editor-host .docx section,
-                .report-editor-host section.docx {
-                  background: transparent !important;
-                  box-shadow: none !important;
-                  margin: 0 0 24px 0 !important;
-                }
-                .report-editor-host table {
-                  border-collapse: collapse !important;
-                }
-              `}</style>
-              <div className="report-editor-host flex-1 overflow-auto bg-white">
-                <div
-                  ref={reportEditorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  onBlur={(e) => {
-                    setReportHtml((e.currentTarget as HTMLDivElement).innerHTML);
-                    setReportContent((e.currentTarget as HTMLDivElement).innerText);
-                  }}
-                  className="min-h-full w-full outline-none text-slate-700"
-                  style={{ fontFamily: '"Microsoft YaHei", "PingFang SC", Inter, sans-serif' }}
-                  dangerouslySetInnerHTML={{ __html: reportHtml }}
-                />
-              </div>
-            </div>
-            
-            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-white shrink-0 rounded-b-xl">
-              <div className="relative">
-                <button
-                  onClick={() => setIsTemplateDropdownOpen(prev => !prev)}
-                  className="min-w-[180px] px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:border-blue-400 hover:bg-slate-50 transition-colors flex items-center justify-between space-x-3"
-                >
-                  <span>{REPORT_TEMPLATE_OPTIONS.find(item => item.id === selectedReportTemplate)?.label || '默认模板'}</span>
-                  <Icon name="ChevronDown" size={16} className={`text-slate-400 transition-transform ${isTemplateDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
-                {isTemplateDropdownOpen && (
-                  <div className="absolute left-0 bottom-full mb-2 w-[220px] bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden z-10">
-                    {REPORT_TEMPLATE_OPTIONS.map(option => (
-                      <button
-                        key={option.id}
-                        onClick={() => handleSwitchReportTemplate(option.id)}
-                        className={`w-full px-4 py-3 text-sm text-left transition-colors ${
-                          option.id === selectedReportTemplate
-                            ? 'bg-blue-50 text-blue-600 font-medium'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center space-x-3">
-                <button 
-                  onClick={() => {
-                    setShowReportPreviewModal(false);
-                    setIsTemplateDropdownOpen(false);
-                  }}
-                  className="px-6 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                >
-                  取消
-                </button>
-                <button 
-                  onClick={downloadWordDocument}
-                  className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20 flex items-center space-x-2"
-                >
-                  <Icon name="Download" size={16} />
-                  <span>确认导出 (Word)</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-      {showSwitchTemplateConfirm && createPortal(
-        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-xl w-[400px] overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="text-base font-bold text-slate-800">切换模板提醒</h3>
+          <div className="bg-white w-[1200px] h-[90vh] rounded-xl shadow-2xl flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 shrink-0 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-800">
+                {exportType === 'checkItems' ? '按清标检查项导出报告' : '按地产报告模板导出报告'}
+              </h3>
               <button 
-                onClick={() => {
-                  setShowSwitchTemplateConfirm(false);
-                  setPendingTemplateId(null);
-                }} 
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                onClick={() => setShowReportPreviewModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
               >
                 <Icon name="X" size={20} />
               </button>
             </div>
-            <div className="p-6">
-              <p className="text-sm text-slate-600 text-center">
-                确定要切换报告模板吗？<br />当前正在编辑的报告内容将会丢失。
-              </p>
+            
+            <div className="flex-1 flex overflow-hidden">
+              {/* 左侧目录树 */}
+              <div className="w-[320px] border-r border-slate-100 bg-slate-50/50 flex flex-col">
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                  {exportType === 'checkItems' ? (
+                    <div className="space-y-1">
+                      {CHECK_ITEM_TREE.map(category => {
+                        const isExpanded = exportExpandedKeys.includes(category.key);
+                        const categoryItems = category.children.map(c => c.key);
+                        
+                        // Handle level 1 without children (like AI report)
+                        if (category.children.length === 0) {
+                          const isChecked = selectedExportCheckItems.includes(category.key);
+                          return (
+                            <div key={category.key} className="flex flex-col">
+                              <label 
+                                className={`flex items-center px-2 py-2 rounded-lg cursor-pointer transition-colors group ${activePreviewKey === category.key ? 'bg-blue-100/50' : 'hover:bg-slate-100'}`}
+                                onClick={() => setActivePreviewKey(category.key)}
+                              >
+                                <div className="w-5 flex justify-center shrink-0"></div>
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 transition-colors ${isChecked ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
+                                  {isChecked && <Icon name="Check" size={12} className="text-white" strokeWidth={3} />}
+                                </div>
+                                <input 
+                                  type="checkbox" 
+                                  className="hidden" 
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedExportCheckItems(prev => [...prev, category.key]);
+                                      setActivePreviewKey(category.key);
+                                    } else {
+                                      setSelectedExportCheckItems(prev => prev.filter(k => k !== category.key));
+                                    }
+                                  }}
+                                />
+                                <span className={`text-sm font-bold flex-1 ${activePreviewKey === category.key ? 'text-blue-700' : 'text-slate-700'}`}>{category.label}</span>
+                              </label>
+                            </div>
+                          );
+                        }
+
+                        const selectedInCategory = categoryItems.filter(k => selectedExportCheckItems.includes(k));
+                        const isAllSelected = selectedInCategory.length === categoryItems.length;
+                        const isIndeterminate = selectedInCategory.length > 0 && !isAllSelected;
+
+                        return (
+                          <div key={category.key} className="flex flex-col">
+                            <div className="flex items-center group">
+                              <div 
+                                className="w-8 h-8 flex items-center justify-center cursor-pointer text-slate-400 hover:bg-slate-200/50 rounded-lg transition-colors shrink-0"
+                                onClick={() => {
+                                  setExportExpandedKeys(prev => 
+                                    isExpanded ? prev.filter(k => k !== category.key) : [...prev, category.key]
+                                  );
+                                }}
+                              >
+                                <Icon 
+                                  name="ChevronRight" 
+                                  size={16} 
+                                  className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+                                />
+                              </div>
+                              <label 
+                                className={`flex-1 flex items-center px-2 py-2 rounded-lg cursor-pointer transition-colors hover:bg-slate-100`}
+                              >
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 transition-colors ${isAllSelected ? 'bg-blue-600 border-blue-600' : isIndeterminate ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
+                                  {isAllSelected && <Icon name="Check" size={12} className="text-white" strokeWidth={3} />}
+                                  {isIndeterminate && <div className="w-2 h-0.5 bg-white rounded-full"></div>}
+                                </div>
+                                <input 
+                                  type="checkbox" 
+                                  className="hidden" 
+                                  checked={isAllSelected}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    if (checked) {
+                                      setSelectedExportCheckItems(prev => Array.from(new Set([...prev, ...categoryItems])));
+                                      // 如果原本没有选中的子项，默认选中第一个
+                                      if (!categoryItems.includes(activePreviewKey)) {
+                                        setActivePreviewKey(categoryItems[0]);
+                                      }
+                                    } else {
+                                      setSelectedExportCheckItems(prev => prev.filter(k => !categoryItems.includes(k)));
+                                      // 如果取消勾选了当前正在预览的子项所在的大类，则清空预览（或切换到其他）
+                                      if (categoryItems.includes(activePreviewKey)) {
+                                        const remainingItems = selectedExportCheckItems.filter(k => !categoryItems.includes(k));
+                                        if (remainingItems.length > 0) {
+                                          setActivePreviewKey(remainingItems[0]);
+                                        } else {
+                                          setActivePreviewKey('');
+                                        }
+                                      }
+                                    }
+                                  }}
+                                />
+                                <span className="text-sm font-bold flex-1 text-slate-700">{category.label}</span>
+                              </label>
+                            </div>
+                            
+                            {isExpanded && (
+                              <div className="pl-7 mt-1 space-y-1">
+                                {category.children.map(child => {
+                                  const isChecked = selectedExportCheckItems.includes(child.key);
+                                  return (
+                                    <label 
+                                      key={child.key}
+                                      className={`flex items-center px-2 py-2 rounded-lg cursor-pointer transition-colors group ${activePreviewKey === child.key ? 'bg-blue-100/50' : 'hover:bg-slate-100'}`}
+                                      onClick={() => setActivePreviewKey(child.key)}
+                                    >
+                                      <div className="w-5 shrink-0"></div>
+                                      <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 transition-colors ${isChecked ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
+                                        {isChecked && <Icon name="Check" size={12} className="text-white" strokeWidth={3} />}
+                                      </div>
+                                      <input 
+                                        type="checkbox" 
+                                        className="hidden"
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedExportCheckItems(prev => [...prev, child.key]);
+                                            setActivePreviewKey(child.key);
+                                          } else {
+                                            setSelectedExportCheckItems(prev => prev.filter(k => k !== child.key));
+                                          }
+                                        }}
+                                      />
+                                      <span className={`text-[13px] flex-1 truncate ${activePreviewKey === child.key ? 'text-blue-700 font-medium' : 'text-slate-600'}`}>
+                                        {child.label}
+                                      </span>
+                                      {child.count > 0 && (
+                                        <span className={`text-[13px] font-medium ml-2 ${activePreviewKey === child.key ? 'text-blue-600' : 'text-slate-400'}`}>
+                                          {child.count}
+                                        </span>
+                                      )}
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="text-xs font-bold text-slate-400 uppercase tracking-widest px-2 mb-3 mt-2">报告模板</div>
+                      {REPORT_TEMPLATE_OPTIONS.map(template => {
+                        const isChecked = selectedReportTemplates.includes(template.id);
+                        return (
+                          <div 
+                            key={template.id}
+                            className={`flex items-center px-3 py-3 rounded-lg cursor-pointer transition-colors group ${activePreviewKey === template.id ? 'bg-blue-100/50' : 'hover:bg-slate-100'}`}
+                            onClick={() => setActivePreviewKey(template.id)}
+                          >
+                            <div className="flex-1 flex items-center space-x-3">
+                              <label className="flex items-center cursor-pointer" onClick={e => e.stopPropagation()}>
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isChecked ? 'bg-blue-600 border-blue-600' : 'border-slate-300 bg-white group-hover:border-blue-400'}`}>
+                                  {isChecked && <Icon name="Check" size={12} className="text-white" strokeWidth={3} />}
+                                </div>
+                                <input 
+                                  type="checkbox"
+                                  className="hidden"
+                                  checked={isChecked}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedReportTemplates(prev => [...prev, template.id]);
+                                    } else {
+                                      setSelectedReportTemplates(prev => prev.filter(k => k !== template.id));
+                                    }
+                                  }}
+                                />
+                              </label>
+                              <span className={`text-sm ${activePreviewKey === template.id ? 'text-blue-700 font-bold' : (isChecked ? 'text-blue-700 font-bold' : 'text-slate-700 font-medium')}`}>
+                                {template.label}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex-1 bg-white p-10 overflow-y-auto custom-scrollbar flex flex-col text-slate-700">
+                
+                {exportType === 'checkItems' ? (
+                  <div className="space-y-8">
+                    {CHECK_ITEM_TREE.map(category => {
+                      // 单独处理 AI 报告层级
+                      if (category.key === 'aiReport') {
+                        if (activePreviewKey !== 'aiReport') return null;
+                        return (
+                          <div key="aiReport" className="space-y-6">
+                            <h2 className="text-lg font-bold text-slate-800 pb-2 border-b border-slate-100">
+                              AI清标报告
+                            </h2>
+                            <div className="text-slate-700">
+                              <div dangerouslySetInnerHTML={{ __html: reportHtml }} />
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // 单独处理对比表层级
+                      if (category.key === 'compareTables') {
+                        if (activePreviewKey === category.key) {
+                          const visibleChildren = category.children;
+                          return (
+                            <div key="compareTables" className="space-y-6">
+                              <h2 className="text-lg font-bold text-slate-800 pb-2 border-b border-slate-100">
+                                {category.label}
+                              </h2>
+                              <div className="space-y-8">
+                                {visibleChildren.map(child => (
+                                  <div key={child.key} className="space-y-4">
+                                    <h3 className="text-[15px] font-bold text-slate-800">{child.label}</h3>
+                                    <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center p-8">
+                                      <div className="text-center text-slate-400">
+                                        <Icon name="Table" size={48} className="mx-auto mb-3 opacity-20" />
+                                        <p className="text-sm font-medium">[{child.label}] 表格数据将在导出时生成</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        } else {
+                          const visibleChild = category.children.find(child => child.key === activePreviewKey);
+                          if (!visibleChild) return null;
+                          return (
+                            <div key={visibleChild.key} className="space-y-6">
+                              <h2 className="text-lg font-bold text-slate-800 pb-2 border-b border-slate-100">
+                                {visibleChild.label}
+                              </h2>
+                              <div className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50 flex items-center justify-center p-8">
+                                <div className="text-center text-slate-400">
+                                  <Icon name="Table" size={48} className="mx-auto mb-3 opacity-20" />
+                                  <p className="text-sm font-medium">[{visibleChild.label}] 表格数据将在导出时生成</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                      }
+
+                      // 处理普通检查项层级
+                      if (activePreviewKey === category.key) {
+                        const visibleChildren = category.children;
+                        return (
+                          <div key={category.key} className="space-y-6">
+                            <h2 className="text-lg font-bold text-slate-800 pb-2 border-b border-slate-100">
+                              {category.label}
+                            </h2>
+                            <div className="space-y-8">
+                              {visibleChildren.map(child => (
+                                <div key={child.key} className="space-y-4">
+                                  <h3 className="text-[15px] font-bold text-slate-800">{child.label}</h3>
+                                  <div className="border border-slate-200 border-dashed rounded-lg p-6 bg-slate-50/50 text-slate-400 text-sm text-center">
+                                    该项报告内容为空（待系统生成数据）
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      } else {
+                        const visibleChild = category.children.find(child => child.key === activePreviewKey);
+                        if (!visibleChild) return null;
+                        return (
+                          <div key={visibleChild.key} className="space-y-6">
+                            <h2 className="text-lg font-bold text-slate-800 pb-2 border-b border-slate-100">
+                              {visibleChild.label}
+                            </h2>
+                            <div className="border border-slate-200 border-dashed rounded-lg p-6 bg-slate-50/50 text-slate-400 text-sm text-center">
+                              该项报告内容为空（待系统生成数据）
+                            </div>
+                          </div>
+                        );
+                      }
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex-1 w-full text-slate-700">
+                    <style>{`
+                      .template-preview p { margin-bottom: 12px; line-height: 1.8; text-align: justify; font-size: 14px; }
+                      .template-preview h2 { font-size: 18px; font-weight: bold; margin: 24px 0 16px; color: #1e293b; }
+                    `}</style>
+                    <div className="template-preview">
+                      {activePreviewKey === 'lvcheng' && (
+                        <>
+                          <h2>绿城地产报告概览</h2>
+                          <p>本次使用【绿城地产报告模板】生成质检报告。项目整体符合规范，但在部分细项存在偏差。</p>
+                          <h2>发现的主要问题 (绿城标准)</h2>
+                          <p>1. 清单工程量与图纸计算结果存在多处不一致。</p>
+                          <p>2. 部分材料品牌未按照招标要求明确，存在合规风险。</p>
+                          <h2>改进建议</h2>
+                          <p>建议施工单位复核相关工程量，并在下一轮回标中补充品牌明细。</p>
+                        </>
+                      )}
+                      {activePreviewKey === 'zhaoshang' && (
+                        <>
+                          <h2>招商地产报告概览</h2>
+                          <p>本次使用【招商地产报告模板】生成质检报告。此模板侧重于成本控制与合规性审查。</p>
+                          <h2>发现的主要问题 (招商标准)</h2>
+                          <p>1. 存在不平衡报价现象，部分分部分项工程单价偏离基准价超15%。</p>
+                          <p>2. 暂估价材料缺少详细的市场询价记录。</p>
+                          <h2>改进建议</h2>
+                          <p>要求投标单位重新提供暂估价材料的询价单，并书面说明单价偏离的原因。</p>
+                        </>
+                      )}
+                      {activePreviewKey === 'jianfa' && (
+                        <>
+                          <h2>建发地产报告概览</h2>
+                          <p>本次使用【建发地产报告模板】生成质检报告。建发体系要求严格的品质与材料对标。</p>
+                          <h2>发现的主要问题 (建发标准)</h2>
+                          <p>1. 装修材料清单中，部分主材未提供样板确认单号。</p>
+                          <p>2. 安装工程中的部分设备参数与招标文件技术要求不符。</p>
+                          <h2>改进建议</h2>
+                          <p>请项目组督促投标人补充材料样板确认单，并修正设备参数响应表。</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="flex items-center justify-end px-6 py-4 border-t border-slate-200 bg-slate-50 space-x-3">
-              <button 
-                onClick={() => {
-                  setShowSwitchTemplateConfirm(false);
-                  setPendingTemplateId(null);
-                }} 
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
-              >
-                取消
-              </button>
-              <button 
-                onClick={confirmSwitchTemplate} 
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors shadow-sm"
-              >
-                确定切换
-              </button>
+            <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50 shrink-0 rounded-b-xl">
+              <div className="text-sm font-medium text-slate-600">
+                当前已选 <span className="text-blue-600 font-bold px-1">{exportType === 'checkItems' ? selectedExportCheckItems.length : selectedReportTemplates.length}</span> 个报告
+              </div>
+              <div className="flex items-center space-x-3">
+                <button 
+                  onClick={() => setShowReportPreviewModal(false)}
+                  className="px-6 py-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  取消
+                </button>
+                <button 
+                  onClick={() => {
+                    downloadWordDocument();
+                    setShowReportPreviewModal(false);
+                  }}
+                  className="px-6 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20 flex items-center space-x-2"
+                >
+                  <Icon name="Download" size={16} />
+                  <span>确认导出</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>,
         document.body
       )}
-      {showTemplateSelectBubble && createPortal(
-        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/20">
+
+      {/* 选择导出类型弹窗 */}
+      {showExportTypeBubble && createPortal(
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/20 backdrop-blur-sm">
           <div className="w-[420px] bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="px-5 py-4 border-b border-slate-100">
-              <div className="text-base font-bold text-slate-800">选择报告模板</div>
-              <div className="mt-1 text-sm text-slate-500">请选择要套用的报告模板，确认后进入编辑预览弹窗。</div>
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <div className="text-base font-bold text-slate-800">选择导出类型</div>
+                <div className="mt-1 text-[13px] text-slate-500">请选择导出的报告类型，确认后进入预览弹窗。</div>
+              </div>
+              <button 
+                onClick={() => setShowExportTypeBubble(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              >
+                <Icon name="X" size={18} />
+              </button>
             </div>
-            <div className="p-4 space-y-2">
-              {REPORT_TEMPLATE_OPTIONS.map(option => (
-                <label
-                  key={option.id}
-                  className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    draftReportTemplate === option.id
-                      ? 'border-blue-600 bg-blue-50/40'
-                      : 'border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="report-template"
-                    checked={draftReportTemplate === option.id}
-                    onChange={() => setDraftReportTemplate(option.id)}
-                    className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-500"
-                  />
-                  <span className={`text-sm ${draftReportTemplate === option.id ? 'text-blue-600 font-medium' : 'text-slate-700'}`}>{option.label}</span>
-                </label>
-              ))}
+            <div className="p-5 space-y-3">
+              <label className={`flex items-center space-x-3 p-4 rounded-xl border cursor-pointer transition-colors group ${
+                exportType === 'checkItems' ? 'border-blue-600 bg-blue-50/40 shadow-sm' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
+                <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                  exportType === 'checkItems' ? 'border-blue-600' : 'border-slate-300 group-hover:border-blue-400'
+                }`}>
+                  {exportType === 'checkItems' && <div className="w-2 h-2 rounded-full bg-blue-600" />}
+                </div>
+                <input
+                  type="radio"
+                  name="export-type"
+                  checked={exportType === 'checkItems'}
+                  onChange={() => setExportType('checkItems')}
+                  className="hidden"
+                />
+                <div className="flex flex-col">
+                  <span className={`text-sm font-bold ${exportType === 'checkItems' ? 'text-blue-700' : 'text-slate-700'}`}>按清标检查项导出</span>
+                  <span className="text-[12px] text-slate-500 mt-0.5">以检查项为维度，自由勾选并生成结构化报告</span>
+                </div>
+              </label>
+
+              <label className={`flex items-center space-x-3 p-4 rounded-xl border cursor-pointer transition-colors group ${
+                exportType === 'templates' ? 'border-blue-600 bg-blue-50/40 shadow-sm' : 'border-slate-200 hover:bg-slate-50'
+              }`}>
+                <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                  exportType === 'templates' ? 'border-blue-600' : 'border-slate-300 group-hover:border-blue-400'
+                }`}>
+                  {exportType === 'templates' && <div className="w-2 h-2 rounded-full bg-blue-600" />}
+                </div>
+                <input
+                  type="radio"
+                  name="export-type"
+                  checked={exportType === 'templates'}
+                  onChange={() => setExportType('templates')}
+                  className="hidden"
+                />
+                <div className="flex flex-col">
+                  <span className={`text-sm font-bold ${exportType === 'templates' ? 'text-blue-700' : 'text-slate-700'}`}>按地产报告模板导出</span>
+                  <span className="text-[12px] text-slate-500 mt-0.5">套用预设的地产标准模板，生成完整的质检报告</span>
+                </div>
+              </label>
             </div>
             <div className="px-5 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end space-x-3">
               <button
-                onClick={() => setShowTemplateSelectBubble(false)}
-                className="px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                onClick={() => setShowExportTypeBubble(false)}
+                className="px-5 py-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 取消
               </button>
               <button
-                onClick={handleConfirmTemplateSelection}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
+                onClick={handleConfirmExportType}
+                className="px-5 py-2.5 text-sm font-bold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20"
               >
                 确定
               </button>
