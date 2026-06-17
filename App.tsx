@@ -9,6 +9,7 @@ import FeeCalculatorView from './components/FeeCalculatorView';
 import AIVisionView from './components/AIVisionView';
 import HomeRenovationCalculatorView from './components/HomeRenovationCalculatorView';
 import AICadTableExtractionView from './components/AICadTableExtractionView';
+import DocumentExtractionView from './components/DocumentExtractionView';
 import OKContractCompareView from './components/OKContractCompareView';
 import OneVsOneCompareView from './components/OneVsOneCompareView';
 import PriceFileCompareView from './components/PriceFileCompareView';
@@ -50,9 +51,11 @@ const App: React.FC = () => {
   const [sharingTool, setSharingTool] = useState<ToolItem | null>(null);
   const [tutorialTool, setTutorialTool] = useState<ToolItem | null>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isHeaderTutorialOpen, setIsHeaderTutorialOpen] = useState(false);
   const [contactModal, setContactModal] = useState<{type: 'wechat' | 'group' | 'qq', title: string, id: string} | null>(null);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const headerTutorialRef = useRef<HTMLDivElement>(null);
 
   // 监听状态变化并保存到 localStorage
   useEffect(() => {
@@ -69,6 +72,9 @@ const App: React.FC = () => {
     const handleClickOutside = (event: MouseEvent) => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
         setIsUserMenuOpen(false);
+      }
+      if (headerTutorialRef.current && !headerTutorialRef.current.contains(event.target as Node)) {
+        setIsHeaderTutorialOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -160,6 +166,30 @@ const App: React.FC = () => {
       </div>
 
       <div className="flex items-center space-x-1">
+        <div className="relative" ref={headerTutorialRef}>
+          <button
+            onClick={() => setIsHeaderTutorialOpen(prev => !prev)}
+            className={`p-2.5 rounded-xl transition-all ${isHeaderTutorialOpen ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'}`}
+            title="教程"
+          >
+            <Icon name="BookOpen" size={20} />
+          </button>
+          {isHeaderTutorialOpen && (
+            <div className="absolute top-full right-0 mt-3 w-[260px] rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_32px_rgba(0,0,0,0.12)] z-[120]">
+              <div className="text-sm font-bold text-slate-800">扫码查看教程</div>
+              <div className="mt-1 text-xs text-slate-500">关注官方抖音号，直达艾造价各类工具教程合集</div>
+              <div className="mt-4 flex items-center justify-center rounded-2xl border border-dashed border-blue-200 bg-[#F5F7FA] h-[180px]">
+                <div className="flex flex-col items-center text-blue-500">
+                  <div className="w-20 h-20 rounded-2xl border-2 border-dashed border-blue-200 flex items-center justify-center bg-white">
+                    <Icon name="QrCode" size={42} className="text-blue-300" />
+                  </div>
+                  <span className="mt-3 text-xs font-medium text-slate-500">二维码预留位置</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         <button 
           onClick={() => handleSelect('feedback')}
           className={`p-2.5 rounded-xl transition-all ${activeId === 'feedback' ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-blue-600 hover:bg-blue-50'}`} 
@@ -312,6 +342,7 @@ const App: React.FC = () => {
         return <LibraryView activeSubId={activeSubId} onReadFile={(file) => setViewingLibFile(file)} />;
       case 'quantity':
         if (activeSubId === 'ai-vision') return <div className="flex-1 flex flex-col overflow-hidden">{renderToolHeader('AI识图算量', 'ai-vision')}<AIVisionView /></div>;
+        if (activeSubId === 'document-extraction') return <div className="flex-1 flex flex-col overflow-hidden">{renderToolHeader('文档识别提取', 'document-extraction')}<DocumentExtractionView /></div>;
         if (activeSubId === 'home-calc') return <div className="flex-1 flex flex-col overflow-hidden">{renderToolHeader('家装计算器', 'home-calc')}<HomeRenovationCalculatorView /></div>;
         if (activeSubId === 'ai-cad') return <div className="flex-1 flex flex-col overflow-hidden">{renderToolHeader('AI批量提取CAD表', 'ai-cad')}<AICadTableExtractionView /></div>;
         if (activeSubId === 'list-compare') return <div className="flex-1 flex flex-col overflow-hidden">{renderToolHeader('清单工程量超额调差对比', 'list-compare')}<ProjectListView /></div>;

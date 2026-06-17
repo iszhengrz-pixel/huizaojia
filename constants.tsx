@@ -8,6 +8,7 @@ export const NAVIGATION_MENU: MenuItem[] = [
     icon: 'Ruler',
     children: [
       { id: 'ai-vision', label: 'AI识图算量', parentId: 'quantity' },
+      { id: 'document-extraction', label: '文档识别提取', parentId: 'quantity' },
       { id: 'ai-cad', label: 'AI批量提取CAD表', parentId: 'quantity' },
       { id: 'home-calc', label: '家装计算器', parentId: 'quantity' },
       { id: 'list-compare', label: '清单工程量超额调差对比', parentId: 'quantity' },
@@ -94,6 +95,16 @@ export const ALL_TOOLS_CATEGORIZED: ToolCategory[] = [
         isHot: true, 
         pricingType: 'paid', 
         isActivated: false,
+      },
+      {
+        id: 'document-extraction',
+        name: '文档识别提取',
+        icon: 'FileSearch',
+        category: '汇计量',
+        parentId: 'quantity',
+        pricingType: 'paid',
+        isActivated: true,
+        description: '识别并提取文档中的表格与关键信息',
       },
       { 
         id: 'home-calc', 
